@@ -1,0 +1,95 @@
+<UserControl x:Class="DentalX.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource BrBgDeep}">
+        <StackPanel Margin="24" MaxWidth="620">
+            <TextBlock Text="Settings" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrText}" Margin="0,0,0,4"/>
+            <TextBlock Text="Admin only" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,20"/>
+
+            <TextBlock Text="General" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
+            <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="18" Margin="0,0,0,20"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Clinic Name" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtClinicName" Style="{StaticResource DarkTextBox}" Height="32" Margin="0,0,0,12"/>
+                    <Button Content="Save" Height="32" Width="100" HorizontalAlignment="Left" Cursor="Hand" Click="SaveGeneral_Click"
+                            Background="#7C3AED" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Measurement Calibration" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
+            <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="18" Margin="0,0,0,20"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Sensor pixel pitch (microns)" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="txtPixelPitch" Style="{StaticResource DarkTextBox}" Height="32" Margin="0,0,0,6"/>
+                    <TextBlock Text="Optional. When set, the Measure tool on the Imaging page shows real millimeters instead of pixels. Leave blank if you don't know your sensor's pixel pitch — the tool still works in pixels."
+                               FontSize="10" Foreground="{StaticResource BrTextMuted}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                    <Button Content="Save" Height="32" Width="100" HorizontalAlignment="Left" Cursor="Hand" Click="SavePixelPitch_Click"
+                            Background="#7C3AED" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Change Your Password" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
+            <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="18" Margin="0,0,0,20"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Current Password" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,4"/>
+                    <PasswordBox x:Name="pwdCurrent" Background="{StaticResource BrBgDark}" Foreground="{StaticResource BrText}"
+                                 BorderBrush="{StaticResource BrBorder}" BorderThickness="1" Padding="8,5" FontSize="12" Height="32" Margin="0,0,0,10"/>
+                    <TextBlock Text="New Password" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,4"/>
+                    <PasswordBox x:Name="pwdNew" Background="{StaticResource BrBgDark}" Foreground="{StaticResource BrText}"
+                                 BorderBrush="{StaticResource BrBorder}" BorderThickness="1" Padding="8,5" FontSize="12" Height="32" Margin="0,0,0,10"/>
+                    <TextBlock Text="Confirm New Password" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,4"/>
+                    <PasswordBox x:Name="pwdConfirm" Background="{StaticResource BrBgDark}" Foreground="{StaticResource BrText}"
+                                 BorderBrush="{StaticResource BrBorder}" BorderThickness="1" Padding="8,5" FontSize="12" Height="32" Margin="0,0,0,10"/>
+                    <TextBlock x:Name="txtPwdMessage" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
+                    <Button Content="Update Password" Height="32" Width="150" HorizontalAlignment="Left" Cursor="Hand" Click="ChangePassword_Click"
+                            Background="#7C3AED" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <Grid Margin="0,0,0,8">
+                <TextBlock Text="Users" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrText}"/>
+                <Button Content="＋ Add User" HorizontalAlignment="Right" Height="28" Padding="10,0" Cursor="Hand" Click="AddUser_Click"
+                        Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrText}" FontSize="11" BorderThickness="0">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+            <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="18"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                <StackPanel x:Name="stackUsers"/>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

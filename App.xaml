@@ -1,0 +1,381 @@
+<Application x:Class="DentalX.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="LoginWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- ═══ Color Palette ═══ -->
+            <Color x:Key="BgDeep">#0B1622</Color>
+            <Color x:Key="BgDark">#0F1D2E</Color>
+            <Color x:Key="BgPanel">#142236</Color>
+            <Color x:Key="BgCard">#1A2B42</Color>
+            <Color x:Key="BgHover">#1E3350</Color>
+            <Color x:Key="AccentTeal">#2FD9C4</Color>
+            <Color x:Key="AccentTealDim">#1A7A6E</Color>
+            <Color x:Key="TextPrimary">#E8ECF1</Color>
+            <Color x:Key="TextSecondary">#8B96A5</Color>
+            <Color x:Key="TextMuted">#556275</Color>
+            <Color x:Key="BorderColor">#1E3350</Color>
+            <Color x:Key="DangerRed">#E74856</Color>
+            <Color x:Key="SuccessGreen">#10B981</Color>
+            <Color x:Key="WarningAmber">#F59E0B</Color>
+            <Color x:Key="InfoBlue">#3B82F6</Color>
+
+            <SolidColorBrush x:Key="BrBgDeep" Color="{StaticResource BgDeep}"/>
+            <SolidColorBrush x:Key="BrBgDark" Color="{StaticResource BgDark}"/>
+            <SolidColorBrush x:Key="BrBgPanel" Color="{StaticResource BgPanel}"/>
+            <SolidColorBrush x:Key="BrBgCard" Color="{StaticResource BgCard}"/>
+            <SolidColorBrush x:Key="BrBgHover" Color="{StaticResource BgHover}"/>
+            <SolidColorBrush x:Key="BrAccent" Color="{StaticResource AccentTeal}"/>
+            <SolidColorBrush x:Key="BrAccentDim" Color="{StaticResource AccentTealDim}"/>
+            <SolidColorBrush x:Key="BrText" Color="{StaticResource TextPrimary}"/>
+            <SolidColorBrush x:Key="BrTextSec" Color="{StaticResource TextSecondary}"/>
+            <SolidColorBrush x:Key="BrTextMuted" Color="{StaticResource TextMuted}"/>
+            <SolidColorBrush x:Key="BrBorder" Color="{StaticResource BorderColor}"/>
+            <SolidColorBrush x:Key="BrDanger" Color="{StaticResource DangerRed}"/>
+            <SolidColorBrush x:Key="BrSuccess" Color="{StaticResource SuccessGreen}"/>
+            <SolidColorBrush x:Key="BrWarning" Color="{StaticResource WarningAmber}"/>
+            <SolidColorBrush x:Key="BrInfo" Color="{StaticResource InfoBlue}"/>
+
+            <!-- ═══ Typography ═══ Segoe UI Variable (Win11) with graceful fallback, plus an
+                 explicit emoji-font fallback so the toolbar glyphs render in color consistently. -->
+            <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI, Segoe UI Emoji</FontFamily>
+            <Style TargetType="{x:Type Window}">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+                <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            </Style>
+            <Style TargetType="{x:Type UserControl}">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            </Style>
+
+            <!-- ═══ Toolbar Button Style — soft lighten-on-hover + a light press-scale for
+                 tactile feedback. The overlay/scale are declared inline in the template, so
+                 each button instance gets its own — animating one never affects another. ═══ -->
+            <Style x:Key="ToolbarBtn" TargetType="Button">
+                <Setter Property="Height" Value="36"/>
+                <Setter Property="Padding" Value="14,0"/>
+                <Setter Property="Foreground" Value="{StaticResource BrText}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                    CornerRadius="7" Padding="{TemplateBinding Padding}"
+                                    BorderThickness="0" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="7" Background="#26FFFFFF" Opacity="0"/>
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.96" Duration="0:0:0.08"/>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.96" Duration="0:0:0.08"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ═══ Nav Button Style ═══ -->
+            <Style x:Key="NavBtn" TargetType="Button">
+                <Setter Property="Height" Value="40"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Padding" Value="16,0"/>
+                <Setter Property="Foreground" Value="{StaticResource BrTextSec}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="8" Background="{StaticResource BrBgHover}" Opacity="0"/>
+                                    <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ═══ Nav Active Button — accent bar on the leading edge ═══ -->
+            <Style x:Key="NavBtnActive" TargetType="Button" BasedOn="{StaticResource NavBtn}">
+                <Setter Property="Background" Value="{StaticResource BrAccentDim}"/>
+                <Setter Property="Foreground" Value="{StaticResource BrText}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="8" Background="{StaticResource BrBgHover}" Opacity="0"/>
+                                    <Border Width="3" CornerRadius="2" Background="{StaticResource BrAccent}" HorizontalAlignment="Left" Margin="0,6"/>
+                                    <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ═══ Viewer Tool Button ═══ -->
+            <Style x:Key="ViewerTool" TargetType="Button">
+                <Setter Property="Width" Value="36"/>
+                <Setter Property="Height" Value="36"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource BrTextSec}"/>
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                    CornerRadius="6" Width="36" Height="36" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="scale" ScaleX="1" ScaleY="1"/>
+                                </Border.RenderTransform>
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="6" Background="{StaticResource BrBgHover}" Opacity="0"/>
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="0.9" Duration="0:0:0.08"/>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="0.9" Duration="0:0:0.08"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/>
+                                                <DoubleAnimation Storyboard.TargetName="scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ═══ Tab Button ═══ -->
+            <Style x:Key="TabBtn" TargetType="Button">
+                <Setter Property="Height" Value="34"/>
+                <Setter Property="Padding" Value="18,0"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource BrTextSec}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                    CornerRadius="6" Padding="{TemplateBinding Padding}"
+                                    BorderThickness="0">
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="6" Background="{StaticResource BrBgHover}" Opacity="0"/>
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="TabBtnActive" TargetType="Button" BasedOn="{StaticResource TabBtn}">
+                <Setter Property="Background" Value="{StaticResource BrAccentDim}"/>
+                <Setter Property="Foreground" Value="{StaticResource BrAccent}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+            </Style>
+
+            <!-- ═══ TextBox Style — border brightens smoothly on focus instead of an instant snap ═══ -->
+            <Style x:Key="DarkTextBox" TargetType="TextBox">
+                <Setter Property="Background" Value="{StaticResource BrBgDark}"/>
+                <Setter Property="Foreground" Value="{StaticResource BrText}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BrBorder}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="8,5"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="CaretBrush" Value="{StaticResource BrText}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource BrAccent}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ═══ Quick Action Button ═══ -->
+            <Style x:Key="QuickAction" TargetType="Button">
+                <Setter Property="Height" Value="36"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Padding" Value="12,0"/>
+                <Setter Property="Foreground" Value="{StaticResource BrTextSec}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                    CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Border x:Name="hoverOverlay" CornerRadius="6" Background="{StaticResource BrBgHover}" Opacity="0"/>
+                                    <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="chevron" Text="›" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource BrTextMuted}" FontSize="16" RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock.RenderTransform>
+                                            <TranslateTransform x:Name="chevronShift" X="0"/>
+                                        </TextBlock.RenderTransform>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                                                <DoubleAnimation Storyboard.TargetName="chevronShift" Storyboard.TargetProperty="X" To="3" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="hoverOverlay" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
+                                                <DoubleAnimation Storyboard.TargetName="chevronShift" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

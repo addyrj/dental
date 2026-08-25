@@ -1,0 +1,23 @@
+<UserControl x:Class="DentalX.ToothChartControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="0,20,0,0">
+        <TextBlock Text="Dental Tooth Chart — FDI notation" FontSize="14" FontWeight="SemiBold"
+                   Foreground="{StaticResource BrText}" Margin="0,0,0,4"/>
+        <TextBlock Text="Click a tooth to cycle its condition. Changes save automatically." FontSize="11"
+                   Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,12"/>
+        <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="18"
+                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+            <StackPanel HorizontalAlignment="Center">
+                <TextBlock Text="Upper Arch" FontSize="10" Foreground="{StaticResource BrTextMuted}"
+                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                <StackPanel x:Name="upperRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <Border Height="1" Background="{StaticResource BrBorder}" Margin="0,4" Width="640"/>
+                <StackPanel x:Name="lowerRow" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                <TextBlock Text="Lower Arch" FontSize="10" Foreground="{StaticResource BrTextMuted}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        <WrapPanel x:Name="legendPanel" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+    </StackPanel>
+</UserControl>

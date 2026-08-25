@@ -1,0 +1,135 @@
+<UserControl x:Class="DentalX.AppointmentsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Loaded="AppointmentsPage_Loaded">
+    <UserControl.Resources>
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource BrBgPanel}"/>
+            <Setter Property="Foreground" Value="{StaticResource BrText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BrBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="{StaticResource BrBgPanel}"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource BrBgCard}"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="RowHeight" Value="46"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource BrBgDark}"/>
+            <Setter Property="Foreground" Value="{StaticResource BrTextSec}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BrBorder}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource BrBgHover}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{StaticResource BrBgDeep}" Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,4">
+            <TextBlock Text="Appointments" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrText}"/>
+            <Button Content="＋ New Appointment" HorizontalAlignment="Right" Height="34" Padding="14,0" Cursor="Hand" Click="NewAppointment_Click"
+                    Background="#7C3AED" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </Grid>
+        <TextBlock Grid.Row="1" x:Name="txtSubtitle" Text="" FontSize="12" Foreground="{StaticResource BrTextMuted}" Margin="0,0,0,16"/>
+
+        <Grid Grid.Row="2">
+            <DataGrid x:Name="grid">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="DATE" Binding="{Binding AppointmentDate}" Width="110"/>
+                    <DataGridTextColumn Header="TIME" Binding="{Binding AppointmentTime}" Width="80"/>
+                    <DataGridTextColumn Header="PATIENT" Binding="{Binding PatientName}" Width="*"/>
+                    <DataGridTextColumn Header="REASON" Binding="{Binding Reason}" Width="2*"/>
+                    <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="100"/>
+                    <DataGridTemplateColumn Header="" Width="220">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="✓ Complete" Click="Complete_Click" Tag="{Binding Id}"
+                                            Background="{StaticResource BrSuccess}" Foreground="White"
+                                            FontSize="10" Height="24" Padding="6,0" Margin="0,0,4,0" BorderThickness="0" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button Content="✕ Cancel" Click="CancelAppt_Click" Tag="{Binding Id}"
+                                            Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrDanger}"
+                                            FontSize="10" Height="24" Padding="6,0" Margin="0,0,4,0" BorderThickness="0" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button Content="👤" ToolTip="Open patient" Click="OpenPatient_Click" Tag="{Binding PatientId}"
+                                            Background="{StaticResource BrAccentDim}" Foreground="{StaticResource BrAccent}"
+                                            FontSize="11" Height="24" Width="24" Padding="0" BorderThickness="0" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <StackPanel x:Name="emptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock Text="📅" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <TextBlock Text="No appointments scheduled." FontSize="14" Foreground="{StaticResource BrTextSec}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Click ＋ New Appointment above to add one." FontSize="12" Foreground="{StaticResource BrTextMuted}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,482 @@
+<UserControl x:Class="DentalX.XRayViewerPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DentalX"
+             Loaded="XRayViewerPage_Loaded">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="24"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ TOOLBAR ═══════════ -->
+        <Border Grid.Row="0" Background="{StaticResource BrBgDark}"
+                BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Margin="16,0" VerticalAlignment="Center">
+                <Button x:Name="btnConnect" Content="⬤ Connect Sensor" Style="{StaticResource ToolbarBtn}"
+                        Background="#1A7A6E" Margin="0,0,6,0" Click="btnConnect_Click"/>
+                <Button x:Name="btnCapture" Content="◉ Capture X-Ray" Style="{StaticResource ToolbarBtn}"
+                        Background="#C13A44" Margin="0,0,6,0" Click="btnCapture_Click" IsEnabled="False"/>
+                <Button Content="🧪 Test" Style="{StaticResource ToolbarBtn}"
+                        Background="#4A5568" Margin="0,0,6,0" Click="btnTestCapture_Click"
+                        ToolTip="Test capture without X-ray"/>
+                <Button Content="📂 Load Image" Style="{StaticResource ToolbarBtn}"
+                        Background="#2563EB" Margin="0,0,6,0" Click="btnLoad_Click"/>
+                <Button Content="✦ Enhance" Style="{StaticResource ToolbarBtn}"
+                        Background="#059669" Margin="0,0,6,0" Click="btnPresetNormal_Click"/>
+                <Button Content="◧ Invert" Style="{StaticResource ToolbarBtn}"
+                        Background="#6D28D9" Margin="0,0,6,0" Click="btnInvert_Click"/>
+                <Button Content="✕ Clear" Style="{StaticResource ToolbarBtn}"
+                        Background="#DC2626" Margin="0,0,6,0" Click="btnClear_Click"/>
+                <Button Content="🗑 Delete" Style="{StaticResource ToolbarBtn}" Background="#7F1D1D" Margin="0,0,6,0" Click="btnDeleteImage_Click"/>
+                <Button Content="👥 All Patients" Style="{StaticResource ToolbarBtn}"
+                        Background="#D97706" Click="btnPatients_Click"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══════════ MAIN CONTENT (viewer + right panel) ═══════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="232"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═══ CENTER — Viewer + Gallery ═══ -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition x:Name="galleryRow" Height="130"/>
+                </Grid.RowDefinitions>
+
+                <!-- Image Type Tabs -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,4,0,0">
+                    <Button x:Name="tabAll" Content="All" Style="{StaticResource TabBtnActive}" Tag="All" Click="Modality_Click"/>
+                    <Button x:Name="tabIntraoral" Content="Intraoral" Style="{StaticResource TabBtn}" Margin="4,0,0,0" Tag="Intraoral" Click="Modality_Click"/>
+                    <Button x:Name="tabPanoramic" Content="Panoramic" Style="{StaticResource TabBtn}" Margin="4,0,0,0" Tag="Panoramic" Click="Modality_Click"/>
+                    <Button x:Name="tabCeph" Content="Cephalometric" Style="{StaticResource TabBtn}" Margin="4,0,0,0" Tag="Cephalometric" Click="Modality_Click"/>
+                    <Button x:Name="tabCBCT" Content="3D CBCT" Style="{StaticResource TabBtn}" Margin="4,0,0,0" Tag="CBCT" Click="Modality_Click"/>
+                </StackPanel>
+
+                <!-- Viewer Area -->
+                <Grid Grid.Row="1" Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="56"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Viewer Toolbar -->
+                    <Border Grid.Column="0" Background="{StaticResource BrBgPanel}" CornerRadius="8,0,0,8" Margin="4,0,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="4,8">
+                            <Button x:Name="toolPan" Content="✋" Style="{StaticResource ViewerTool}" ToolTip="Pan (hold middle mouse)" Click="btnToolPan_Click"/>
+                            <Button x:Name="toolSelect" Content="↖" Style="{StaticResource ViewerTool}" ToolTip="Select"/>
+                            <Button Content="⊕" Style="{StaticResource ViewerTool}" ToolTip="Zoom In (+)" Click="btnZoomIn_Click"/>
+                            <Button Content="⊖" Style="{StaticResource ViewerTool}" ToolTip="Zoom Out (-)" Click="btnZoomOut_Click"/>
+                            <Button x:Name="toolMagnifier" Content="🔍" Style="{StaticResource ViewerTool}" ToolTip="Magnifier — hover the image to inspect at high zoom" Click="btnMagnifier_Click"/>
+                            <Button Content="↻" Style="{StaticResource ViewerTool}" ToolTip="Rotate (R)" Click="btnRotate_Click"/>
+                            <Button Content="☀" Style="{StaticResource ViewerTool}" ToolTip="Window/Level (right-drag)" Click="btnPresetNormal_Click"/>
+                            <Button x:Name="btnCrop" Content="⬒" Style="{StaticResource ViewerTool}" ToolTip="Crop — drag a rectangle, then Apply" Click="btnCrop_Click"/>
+                            <Button x:Name="btnAnnotate" Content="✎" Style="{StaticResource ViewerTool}" ToolTip="Annotate — click to add a text label (right-click a label to remove it)" Click="btnAnnotate_Click"/>
+                            <Button x:Name="btnMeasure" Content="📏" Style="{StaticResource ViewerTool}" ToolTip="Measure — Distance, Tooth Length, Angle, Calibration" Click="btnMeasure_Click"/>
+                            <Button Content="T" Style="{StaticResource ViewerTool}" ToolTip="Text annotation" FontWeight="Bold" Click="btnAnnotate_Click"/>
+                            <Button Content="▭" Style="{StaticResource ViewerTool}" ToolTip="ROI rectangle (coming soon)" Click="btnPlaceholder_Click"/>
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Image Display with mouse interaction -->
+                    <Border Grid.Column="1" Background="#0A0E14" CornerRadius="0,8,8,0" Margin="0,0,4,0"
+                            ClipToBounds="True" x:Name="viewerBorder"
+                            MouseWheel="Viewer_MouseWheel"
+                            MouseLeftButtonDown="Viewer_MouseLeftButtonDown"
+                            MouseLeftButtonUp="Viewer_MouseLeftButtonUp"
+                            MouseMove="Viewer_MouseMove"
+                            MouseRightButtonDown="Viewer_RightMouseDown"
+                            MouseRightButtonUp="Viewer_RightMouseUp"
+                            MouseLeave="Viewer_MouseLeave">
+                        <Grid x:Name="viewerCanvas" Background="#0A0E14">
+                            <Image x:Name="imgDisplay" Stretch="Uniform"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Margin="4"
+                                   RenderTransformOrigin="0.5,0.5">
+                                <Image.RenderTransform>
+                                    <TransformGroup>
+                                        <ScaleTransform x:Name="imgScale" ScaleX="1" ScaleY="1"/>
+                                        <RotateTransform x:Name="imgRotate" Angle="0"/>
+                                        <TranslateTransform x:Name="imgTranslate" X="0" Y="0"/>
+                                    </TransformGroup>
+                                </Image.RenderTransform>
+                            </Image>
+                            <!-- R marker -->
+                            <TextBlock Text="R" Foreground="White" FontSize="20" FontWeight="Bold"
+                                       Margin="20,0,0,20" VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                                       Opacity="0.4"/>
+
+                            <!-- Measurement mode strip — shown only while the 📏 tool is active -->
+                            <Border x:Name="measureControls" Background="#CC10151C" CornerRadius="6" Padding="8"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0"
+                                    Visibility="Collapsed" BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <Button x:Name="measureBtnDistance" Content="📏 Distance" Tag="Distance" Click="MeasureModeButton_Click"
+                                                Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                                Foreground="{StaticResource BrText}" Height="26" Padding="8,0" FontSize="11" Margin="0,0,4,0"/>
+                                        <Button x:Name="measureBtnTooth" Content="🦷 Tooth Length" Tag="ToothLength" Click="MeasureModeButton_Click"
+                                                Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                                Foreground="{StaticResource BrText}" Height="26" Padding="8,0" FontSize="11" Margin="0,0,4,0"/>
+                                        <Button x:Name="measureBtnAngle" Content="∠ Angle" Tag="Angle" Click="MeasureModeButton_Click"
+                                                Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                                Foreground="{StaticResource BrText}" Height="26" Padding="8,0" FontSize="11" Margin="0,0,4,0"/>
+                                        <Button x:Name="measureBtnCalibrate" Content="📐 Calibrate" Tag="Calibrate" Click="MeasureModeButton_Click"
+                                                Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                                Foreground="{StaticResource BrText}" Height="26" Padding="8,0" FontSize="11" Margin="0,0,4,0"/>
+                                        <Button Content="✕" Click="btnMeasure_Click" Style="{StaticResource ViewerTool}"
+                                                Width="24" Height="24" ToolTip="Turn measure off"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="txtCalibrationStatus" Text="Not calibrated — showing pixels only"
+                                               FontSize="10" Foreground="{StaticResource BrTextMuted}"/>
+                                    <TextBlock Text="Radiographic measurement only — not true anatomical length"
+                                               FontSize="9" FontStyle="Italic" Foreground="{StaticResource BrTextMuted}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Magnifier callout — tangent lines + small anchor circle connecting the
+                                 exact cursor point to the offset zoomed circle (magnifierLoupe below) -->
+                            <Line x:Name="magTangent1" Stroke="White" StrokeThickness="1.5" Opacity="0.85"
+                                  Visibility="Collapsed" IsHitTestVisible="False"/>
+                            <Line x:Name="magTangent2" Stroke="White" StrokeThickness="1.5" Opacity="0.85"
+                                  Visibility="Collapsed" IsHitTestVisible="False"/>
+                            <Ellipse x:Name="magAnchor" Width="20" Height="20" Stroke="White" StrokeThickness="2"
+                                     HorizontalAlignment="Left" VerticalAlignment="Top"
+                                     Visibility="Collapsed" IsHitTestVisible="False"/>
+
+                            <!-- Magnifier zoom-level strip — shown only while the 🔍 tool is active -->
+                            <Border x:Name="magnifierControls" Background="#CC10151C" CornerRadius="6" Padding="4"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,0"
+                                    Visibility="Collapsed" BorderBrush="{StaticResource BrBorder}" BorderThickness="1"
+                                    IsHitTestVisible="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🔍" FontSize="12" VerticalAlignment="Center" Margin="4,0,6,0"/>
+                                    <Button x:Name="magBtn1x" Content="1x" Tag="1" Click="MagZoomLevel_Click"
+                                            Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                            Foreground="{StaticResource BrText}" Height="24" Padding="8,0" FontSize="11" Margin="0,0,3,0"/>
+                                    <Button x:Name="magBtn2x" Content="2x" Tag="2" Click="MagZoomLevel_Click"
+                                            Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrAccentDim}"
+                                            Foreground="{StaticResource BrText}" Height="24" Padding="8,0" FontSize="11" Margin="0,0,3,0"/>
+                                    <Button x:Name="magBtn4x" Content="4x" Tag="4" Click="MagZoomLevel_Click"
+                                            Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                            Foreground="{StaticResource BrText}" Height="24" Padding="8,0" FontSize="11" Margin="0,0,6,0"/>
+                                    <Button Content="✕" Click="btnMagnifier_Click" Style="{StaticResource ViewerTool}"
+                                            Width="24" Height="24" ToolTip="Turn magnifier off"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Circular magnifier loupe — follows the cursor while magnifier mode is on -->
+                            <Border x:Name="magnifierLoupe" Width="200" Height="200" CornerRadius="100"
+                                    Background="Transparent" BorderBrush="White" BorderThickness="3"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Visibility="Collapsed" IsHitTestVisible="False">
+                                <Border.Clip>
+                                    <EllipseGeometry Center="100,100" RadiusX="98" RadiusY="98"/>
+                                </Border.Clip>
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="18" ShadowDepth="0" Opacity="0.7"/>
+                                </Border.Effect>
+                                <Grid>
+                                    <Image x:Name="imgMagnifier" Stretch="Fill" Width="200" Height="200"
+                                           RenderTransformOrigin="0.5,0.5">
+                                        <Image.RenderTransform>
+                                            <RotateTransform x:Name="magRotate" Angle="0"/>
+                                        </Image.RenderTransform>
+                                    </Image>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Zoom Controls Bar -->
+                <Border Grid.Row="2" Background="{StaticResource BrBgPanel}" CornerRadius="6" Margin="4,4">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Button Content="−" Style="{StaticResource ViewerTool}" Width="30" Height="28" Click="btnZoomOut_Click"/>
+                        <TextBlock x:Name="txtZoom" Text="100%" Foreground="{StaticResource BrText}"
+                                   FontSize="12" VerticalAlignment="Center" Width="44" TextAlignment="Center"/>
+                        <Button Content="+" Style="{StaticResource ViewerTool}" Width="30" Height="28" Click="btnZoomIn_Click"/>
+                        <Button Content="Fit" Style="{StaticResource ToolbarBtn}" Background="{StaticResource BrBgCard}"
+                                Height="28" Margin="8,0" Padding="12,0" Click="btnFit_Click"/>
+                        <Slider x:Name="sliderZoom" Minimum="10" Maximum="500" Value="100" Width="180"
+                                VerticalAlignment="Center" Margin="8,0"
+                                ValueChanged="sliderZoom_ValueChanged"/>
+                        <Button Content="☀" Style="{StaticResource ViewerTool}" Width="28" Height="28"
+                                ToolTip="Auto Enhance" Click="btnPresetNormal_Click"/>
+                        <Button Content="◑" Style="{StaticResource ViewerTool}" Width="28" Height="28"
+                                Click="btnInvert_Click" ToolTip="Invert (I)"/>
+                        <Button Content="⛶" Style="{StaticResource ViewerTool}" Width="28" Height="28"
+                                ToolTip="Reset View" Click="btnFit_Click"/>
+                        <Button Content="⤢" Style="{StaticResource ViewerTool}" Width="28" Height="28"
+                                ToolTip="Full Zoom — view large (or double-click the image)" Click="FullZoom_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Image Gallery -->
+                <Border Grid.Row="3" Background="{StaticResource BrBgDark}"
+                        BorderBrush="{StaticResource BrBorder}" BorderThickness="0,1,0,0">
+                    <Grid Margin="8,6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="30"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Gallery —" Foreground="{StaticResource BrTextMuted}" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="txtGalleryFilter" Text="All Images" Foreground="{StaticResource BrText}"
+                                           FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                <TextBlock Text="(pick a type above to filter)" Foreground="{StaticResource BrTextMuted}"
+                                           FontSize="10" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                <TextBlock Text="Sort by: Newest" Foreground="{StaticResource BrTextMuted}"
+                                           FontSize="11" VerticalAlignment="Center" Margin="24,0,0,0"/>
+                            </StackPanel>
+                            <Button x:Name="btnGalleryGridToggle" Content="⊞ Grid View" HorizontalAlignment="Right" Height="22" Padding="8,0"
+                                    Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrTextSec}" FontSize="10" BorderThickness="0"
+                                    Cursor="Hand" Click="GalleryGridToggle_Click">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                        <ScrollViewer x:Name="galleryScroll" Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled" Margin="0,6,0,0">
+                            <WrapPanel x:Name="galleryPanel" Orientation="Horizontal"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- Full Zoom overlay — covers the whole viewer column (tabs/viewer/zoombar/gallery)
+                     but leaves the sidebar and right panel visible, matching the agreed mockup. -->
+                <Grid x:Name="fullZoomOverlay" Grid.RowSpan="4" Background="#0A0E14" Visibility="Collapsed" ClipToBounds="True">
+                    <Image x:Name="imgFullZoom" Stretch="Fill"/>
+                    <Border Width="34" Height="34" CornerRadius="17" Background="#CC000000"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,16,16,0"
+                            Cursor="Hand" MouseLeftButtonDown="CloseFullZoom_Click" ToolTip="Close (Esc)">
+                        <TextBlock Text="✕" Foreground="White" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- ═══ RIGHT PANEL ═══ -->
+            <Border Grid.Column="1" Background="{StaticResource BrBgDark}"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="1,0,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10,12">
+
+                        <!-- Sensor status now lives in the header pill (name + connect state) —
+                             no need to duplicate it here. Full detail (serial/type/FW) is on
+                             the Devices page. -->
+
+                        <!-- Enhancement Sliders -->
+                        <TextBlock Text="Enhancement" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,6"
+                                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Brightness" Foreground="{StaticResource BrTextSec}" FontSize="11"/>
+                                    <TextBlock x:Name="txtBrightVal" Text="0" Foreground="{StaticResource BrAccent}" FontSize="11" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="sliderBrightness" Minimum="-100" Maximum="100" Value="0"
+                                        ValueChanged="EnhSlider_ValueChanged"/>
+
+                                <Grid Margin="0,8,0,4">
+                                    <TextBlock Text="Contrast (CLAHE)" Foreground="{StaticResource BrTextSec}" FontSize="11"/>
+                                    <TextBlock x:Name="txtContrastVal" Text="0" Foreground="{StaticResource BrAccent}" FontSize="11" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="sliderContrast" Minimum="0" Maximum="8" Value="0" SmallChange="0.5"
+                                        ValueChanged="EnhSlider_ValueChanged"/>
+
+                                <Grid Margin="0,8,0,4">
+                                    <TextBlock Text="Gamma" Foreground="{StaticResource BrTextSec}" FontSize="11"/>
+                                    <TextBlock x:Name="txtGammaVal" Text="1.00" Foreground="{StaticResource BrAccent}" FontSize="11" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="sliderGamma" Minimum="0.2" Maximum="3.0" Value="1.0" SmallChange="0.05"
+                                        ValueChanged="EnhSlider_ValueChanged"/>
+
+                                <Grid Margin="0,8,0,4">
+                                    <TextBlock Text="Sharpness" Foreground="{StaticResource BrTextSec}" FontSize="11"/>
+                                    <TextBlock x:Name="txtSharpVal" Text="0" Foreground="{StaticResource BrAccent}" FontSize="11" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="sliderSharp" Minimum="0" Maximum="3" Value="0" SmallChange="0.1"
+                                        ValueChanged="EnhSlider_ValueChanged"/>
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="Apply" Grid.Column="0" Height="30" Margin="0,0,3,0"
+                                            Background="{StaticResource BrAccentDim}" Foreground="{StaticResource BrAccent}"
+                                            FontSize="11" FontWeight="SemiBold" BorderThickness="0" Click="btnApplySliders_Click">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button Content="Reset" Grid.Column="1" Height="30" Margin="3,0,0,0"
+                                            Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrTextSec}"
+                                            FontSize="11" BorderThickness="0" Click="btnResetSliders_Click">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="6"
+                                                        BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Presets -->
+                        <WrapPanel Margin="0,4,0,14">
+                            <Button Content="Auto" Style="{StaticResource ToolbarBtn}" Background="#059669"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnPresetNormal_Click"/>
+                            <Button Content="Hi-Con" Style="{StaticResource ToolbarBtn}" Background="#2563EB"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnPresetHighContrast_Click"/>
+                            <Button Content="Caries" Style="{StaticResource ToolbarBtn}" Background="#D97706"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnPresetCaries_Click"/>
+                            <Button Content="Endo" Style="{StaticResource ToolbarBtn}" Background="#7C3AED"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnPresetEndo_Click"/>
+                            <Button Content="Perio" Style="{StaticResource ToolbarBtn}" Background="#0D9488"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnPresetPerio_Click"/>
+                            <Button Content="Bone" Style="{StaticResource ToolbarBtn}" Background="#3B82F6"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnColorBone_Click"/>
+                            <Button Content="Thermal" Style="{StaticResource ToolbarBtn}" Background="#92400E"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnColorThermal_Click"/>
+                            <Button Content="Edge" Style="{StaticResource ToolbarBtn}" Background="#3F6212"
+                                    Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnEdgeMap_Click"/>
+                        </WrapPanel>
+
+                        <!-- AI Analysis -->
+                        <TextBlock Text="AI Analysis" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,14"
+                                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock x:Name="txtAIStatus" Text="AI Detection: coming soon" Foreground="{StaticResource BrAccent}"
+                                           FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Ellipse Width="8" Height="8" Fill="#EF4444" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Caries" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="txtAICaries" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Ellipse Width="8" Height="8" Fill="#F59E0B" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Bone Loss" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="txtAIBone" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Ellipse Width="8" Height="8" Fill="#F97316" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Periapical Radiolucency" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="txtAIPerio" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Ellipse Width="8" Height="8" Fill="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Calculus" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="txtAICalc" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
+                                </StackPanel>
+                                <Button Content="View Full Analysis" Height="32" Margin="0,8,0,0"
+                                        Background="{StaticResource BrAccentDim}" Foreground="{StaticResource BrAccent}"
+                                        FontSize="11" FontWeight="SemiBold" BorderThickness="0" Click="btnAIAnalysis_Click">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Attach to Patient — picks an EXISTING patient rather than free-form
+                             creating a new one, so this doesn't spawn duplicate patient rows.
+                             Full patient create/edit/delete lives on the Patients pages. -->
+                        <TextBlock Text="Patient" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,14"
+                                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock x:Name="txtAttachedPatient" Text="No patient selected" FontSize="12"
+                                           Foreground="{StaticResource BrTextMuted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <Grid Margin="0,0,0,8">
+                                    <TextBox x:Name="txtSearchPatient" Style="{StaticResource DarkTextBox}"
+                                             Height="30" FontSize="11" TextChanged="txtSearchPatient_TextChanged"/>
+                                    <TextBlock Text="Search patient..." Foreground="{StaticResource BrTextMuted}" FontSize="11"
+                                               Margin="10,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                               Visibility="{Binding Text.Length, ElementName=txtSearchPatient, Converter={x:Static local:VisConverter.Instance}}"/>
+                                </Grid>
+                                <ListBox x:Name="lstPatients" Background="{StaticResource BrBgDark}"
+                                         Foreground="{StaticResource BrText}" FontSize="11"
+                                         BorderBrush="{StaticResource BrBorder}" BorderThickness="1"
+                                         Height="120" SelectionChanged="lstPatients_SelectionChanged" Margin="0,0,0,10"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="📎 Attach Image" Height="30" Margin="0,0,3,0" Padding="6,0"
+                                            Background="#059669" Foreground="White" FontSize="11" FontWeight="SemiBold" BorderThickness="0"
+                                            Click="AttachImage_Click" ToolTip="Attach the currently loaded/captured image to the selected patient">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button Grid.Column="1" Content="＋ New Patient" Height="30" Margin="3,0,0,0" Padding="6,0"
+                                            Background="#7C3AED" Foreground="White" FontSize="11" FontWeight="SemiBold" BorderThickness="0"
+                                            Click="NewPatientQuick_Click">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ STATUS BAR ═══════════ -->
+        <Border Grid.Row="2" Background="{StaticResource BrBgDark}"
+                BorderBrush="{StaticResource BrBorder}" BorderThickness="0,1,0,0">
+            <Grid Margin="16,0">
+                <TextBlock x:Name="txtStatus" Text="Ready — Connect sensor or load an X-ray image"
+                           Foreground="{StaticResource BrTextMuted}" FontSize="11" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="txtStorage" Text="Storage: —" Foreground="{StaticResource BrTextMuted}" FontSize="11"/>
+                    <TextBlock Text="Version: 1.0.0" Foreground="{StaticResource BrTextMuted}" FontSize="11" Margin="16,0,0,0"/>
+                    <Ellipse Width="8" Height="8" Fill="{StaticResource BrSuccess}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text=" Online" Foreground="{StaticResource BrTextMuted}" FontSize="11"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

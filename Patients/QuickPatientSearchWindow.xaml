@@ -1,0 +1,33 @@
+<Window x:Class="DentalX.QuickPatientSearchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Quick Patient Search" Height="480" Width="440"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BrBgDeep}"
+        ResizeMode="NoResize" WindowStyle="None"
+        BorderBrush="{StaticResource BrBorder}" BorderThickness="1"
+        Deactivated="Window_Deactivated">
+    <Border Background="{StaticResource BrBgPanel}" CornerRadius="12"
+            BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock Text="🔍 Quick Patient Search" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
+                <TextBox x:Name="txtSearch" Style="{StaticResource DarkTextBox}" Height="34" FontSize="13"
+                         TextChanged="txtSearch_TextChanged" KeyDown="txtSearch_KeyDown"/>
+            </StackPanel>
+
+            <ListBox x:Name="lstResults" Grid.Row="1" Background="{StaticResource BrBgDark}" Foreground="{StaticResource BrText}"
+                     BorderBrush="{StaticResource BrBorder}" BorderThickness="1" FontSize="12"
+                     MouseDoubleClick="lstResults_MouseDoubleClick" KeyDown="lstResults_KeyDown"/>
+
+            <TextBlock Grid.Row="2" Text="Enter/double-click to open profile · Esc to close" FontSize="10"
+                       Foreground="{StaticResource BrTextMuted}" Margin="0,8,0,0" HorizontalAlignment="Center"/>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,176 @@
+<Window x:Class="DentalX.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:DentalX"
+        Title="Dental X-Ray Imaging System" Height="900" Width="1500"
+        Background="{StaticResource BrBgDeep}"
+        WindowState="Maximized" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ TITLE BAR ═══════════ -->
+        <Border Grid.Row="0" Background="{StaticResource BrBgDark}"
+                BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,0,1">
+            <Grid Margin="16,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="logo.png" Height="28" Margin="0,0,10,0" Stretch="Uniform"/>
+                    <TextBlock Text="Dental X-Ray Imaging System" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrText}" VerticalAlignment="Center"/>
+                    <!-- Sensor connection status pill: green #25d366 connected / red #bb2124 disconnected.
+                         Sensor name lives here too, so the right-panel Sensor card is redundant and removed. -->
+                    <Border x:Name="hdrSensorPill" Background="#bb2124" CornerRadius="11" Padding="10,3" Margin="20,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="White" Opacity="0.9" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Text="Hamamatsu Sensor" Foreground="White" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBlock x:Name="hdrSensorDetail" Text="" Foreground="White" FontSize="11" Opacity="0.85" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed"/>
+                            <TextBlock Text="·" Foreground="White" Opacity="0.6" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <TextBlock x:Name="hdrSensorText" Text="Disconnected" Foreground="White" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="☀" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="0,0,16,0" VerticalAlignment="Center"
+                               ToolTip="Light theme — coming soon"/>
+                    <TextBlock Text="⚙" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="0,0,16,0" VerticalAlignment="Center"
+                               Cursor="Hand" MouseLeftButtonDown="SettingsIcon_Click" ToolTip="Settings"/>
+                    <Border Background="{StaticResource BrAccentDim}" CornerRadius="14" Width="28" Height="28" Margin="0,0,8,0"
+                            Cursor="Hand" MouseLeftButtonDown="Avatar_Click" ToolTip="Click to log out">
+                        <TextBlock x:Name="txtAvatarInitials" Text="??" Foreground="{StaticResource BrAccent}" FontSize="11"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonDown="Avatar_Click" ToolTip="Click to log out">
+                        <TextBlock x:Name="txtUserName" Text="—" Foreground="{StaticResource BrText}" FontSize="12"/>
+                        <TextBlock x:Name="txtUserRole" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="10"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══════════ MAIN CONTENT ═══════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="sidebarColumn" Width="168"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ═══ LEFT SIDEBAR — global navigation (collapsible) ═══ -->
+            <Border Grid.Column="0" Background="{StaticResource BrBgDark}"
+                    BorderBrush="{StaticResource BrBorder}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Margin="8,12,8,0">
+                        <Button x:Name="btnToggleSidebar" Content="☰" Height="36" HorizontalContentAlignment="Center"
+                                Background="Transparent" Foreground="{StaticResource BrTextSec}" FontSize="16" BorderThickness="0"
+                                Cursor="Hand" Click="ToggleSidebar_Click" Margin="4,0,4,10" ToolTip="Expand / collapse sidebar">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="{StaticResource BrBgHover}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="navDashboard" Style="{StaticResource NavBtnActive}" Tag="Dashboard" Click="Nav_Click" ToolTip="Dashboard">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⊞" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblDashboard" Text="Dashboard" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navPatients" Style="{StaticResource NavBtn}" Tag="Patients" Click="Nav_Click" ToolTip="Patients">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="👤" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblPatients" Text="Patients" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navAppointments" Style="{StaticResource NavBtn}" Tag="Appointments" Click="Nav_Click" ToolTip="Appointments">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📅" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblAppointments" Text="Appointments" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navImaging" Style="{StaticResource NavBtn}" Tag="Imaging" Click="Nav_Click" ToolTip="Imaging">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📷" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblImaging" Text="Imaging" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navAI" Style="{StaticResource NavBtn}" Tag="AI" Click="Nav_Click" ToolTip="AI Analysis">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🧠" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblAI" Text="AI Analysis" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navCompare" Style="{StaticResource NavBtn}" Tag="Compare" Click="Nav_Click" ToolTip="Compare">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⊟" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblCompare" Text="Compare" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navTreatment" Style="{StaticResource NavBtn}" Tag="Treatment" Click="Nav_Click" ToolTip="Treatment Plan">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📋" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblTreatment" Text="Treatment Plan" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navReports" Style="{StaticResource NavBtn}" Tag="Reports" Click="Nav_Click" ToolTip="Reports">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📄" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblReports" Text="Reports" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navDicom" Style="{StaticResource NavBtn}" Tag="Dicom" Click="Nav_Click" ToolTip="DICOM">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⇄" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblDicom" Text="DICOM" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navDevices" Style="{StaticResource NavBtn}" Tag="Devices" Click="Nav_Click" ToolTip="Devices">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔌" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblDevices" Text="Devices" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navBackup" Style="{StaticResource NavBtn}" Tag="Backup" Click="Nav_Click" ToolTip="Backup">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🗄" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblBackup" Text="Backup" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="navSettings" Style="{StaticResource NavBtn}" Tag="Settings" Click="Nav_Click" ToolTip="Settings">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚙" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblSettings" Text="Settings" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel x:Name="quickActionsPanel" Grid.Row="1" Margin="8,0,8,12">
+                        <TextBlock Text="Quick Actions" Foreground="{StaticResource BrAccent}"
+                                   FontSize="12" FontWeight="SemiBold" Margin="12,0,0,8"/>
+                        <Button Content="＋ New Patient" Style="{StaticResource QuickAction}" Click="QuickNewPatient_Click"/>
+                        <Button Content="📥 Import DICOM" Style="{StaticResource QuickAction}" Click="QuickImportDicom_Click"/>
+                        <Button Content="📤 Export Report" Style="{StaticResource QuickAction}" Click="QuickExport_Click"/>
+                        <Button Content="🖨 Print" Style="{StaticResource QuickAction}" Click="QuickPrint_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ═══ PAGE CONTENT HOST ═══ -->
+            <ContentControl x:Name="contentHost" Grid.Column="1"/>
+        </Grid>
+    </Grid>
+</Window>
