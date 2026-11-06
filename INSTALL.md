@@ -67,6 +67,34 @@ Done — this PC now has its own fully independent copy: its own patients, its o
 
 ---
 
+## Sensor Driver Setup — one time, per PC, only if using a real sensor
+
+**This is separate from installing DentalX itself**, and it's the reason a freshly-extracted copy can run perfectly (Test capture, Load Image, every tool) while still failing to connect to a real Hamamatsu sensor. The app talks to the sensor through `CMOS_USB.dll`, but that DLL can only see the sensor once Windows has bound the right low-level USB driver to it — that binding is a one-time, per-PC, per-Windows-install step that has nothing to do with our `.zip`, the same way a USB scanner or printer needs its driver installed once regardless of which program later uses it.
+
+**Symptom this explains:** software runs fine, "Connect Sensor" does nothing / never finds the device, and plugging the sensor in doesn't trigger the auto-connect — even though the exact same hardware works instantly on another PC. The auto-connect polling logic itself isn't broken; it's checking for a device Windows hasn't recognized yet.
+
+The driver package lives in this project's `Driver\` folder (`IntraOralXrayImageSensor.inf` + `.cat`) and `publish.ps1` now copies it into every zip automatically, right alongside `DentalX.exe`.
+
+### Installing it on a new PC
+
+**Option A — plug-and-play stays automatic afterward (recommended):**
+1. Open **PowerShell as Administrator** on the new PC.
+2. `cd` into the extracted DentalX folder, then into `Driver`.
+3. Run:
+   ```
+   pnputil /add-driver IntraOralXrayImageSensor.inf /install
+   ```
+4. Now plug in the Hamamatsu sensor (or unplug/replug it if it was already connected) — Windows will bind the driver immediately and DentalX's existing auto-connect (checks every 3 seconds) will pick it up with no further steps, exactly as designed.
+
+**Option B — no admin terminal, via Device Manager:**
+1. Plug in the sensor. It'll likely show up under **Other devices** with a warning icon (Windows doesn't know what it is yet).
+2. Open **Device Manager**, right-click that device → **Update driver** → **Browse my computer for drivers**.
+3. Point it at the extracted `Driver` folder → **Next**. Windows installs it (a UAC prompt is normal — this step does need admin rights, unlike running the app itself).
+
+Either way, this is truly one-time per PC — once Windows has the driver, every future plug-in is instant and automatic, on that machine, forever (surviving DentalX updates, reinstalls, even deleting and re-extracting the app folder, since the driver lives in Windows itself, not in the app folder).
+
+---
+
 ## Updating an existing install to a newer version
 
 1. Publish a new zip as in Part 1.

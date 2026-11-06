@@ -51,8 +51,12 @@ namespace DentalX
             txtSelectedPatient.Text = $"{_selectedPatient.Name}  (P-{_selectedPatient.Id:D5})";
             _exams = db.GetExaminationsForPatient(id);
             lstExams.ItemsSource = _exams.Select(ex => $"{ex.Modality} — {ex.Date}").ToList();
-            _selectedExam = null;
             txtStatus.Text = "";
+
+            // Auto-select when there's exactly one exam, so a patient with a single X-ray doesn't
+            // require an extra, easy-to-miss click before Generate & Print does anything.
+            if (_exams.Count == 1) lstExams.SelectedIndex = 0;
+            else _selectedExam = null;
         }
 
         private void lstExams_SelectionChanged(object sender, SelectionChangedEventArgs e)

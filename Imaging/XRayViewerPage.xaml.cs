@@ -24,6 +24,7 @@ namespace DentalX
         private SensorManager sensor = new SensorManager();
         private BitmapSource? originalImage = null;
         private BitmapSource? enhancedImage = null;
+        private BitmapSource? _lastAttachedEnhanced = null; // so re-clicking Attach doesn't save the same enhanced copy twice
         private double currentZoom = 100;
         private double currentRotation = 0;
         private bool isProcessing = false;
@@ -43,14 +44,21 @@ namespace DentalX
         private int _draggingHandleIndex;
         private bool _galleryGridMode = false;
 
+        // ─── Tooth Length tool (crown tip + apex clicks → length + automatic crown breadth) ───
+        private bool _toothMode = false;
+        private readonly List<System.Windows.Point> _pendingToothPoints = new();
+        private System.Windows.Shapes.Ellipse? _pendingToothMarker;
+        private static readonly Brush ToothWidthBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x5C, 0xC8)); // pink
+
         // One placed measurement overlay (Distance / Tooth Length / Angle). Coordinates are
         // stored in image-pixel space so they stay correct across zoom/pan/rotate and round-trip
         // cleanly to/from the database regardless of the viewer's current transform.
         private class MeasureVisual
         {
             public int DbId = -1;
-            public string Kind = "Distance"; // Distance | ToothLength | Angle | Calibrate
+            public string Kind = "Distance"; // Distance | ToothLength | Angle | Calibrate | AutoLength | AutoWidth
             public int ToothNumber = 0;
+            public bool Estimated;           // auto-computed and not yet adjusted by hand → label shows "~"
             public System.Windows.Point P1, P2, P3;
             public bool HasP3 = false;
             public System.Windows.Shapes.Line Line1 = null!;
@@ -95,6 +103,12 @@ namespace DentalX
             _sensorTimer.Interval = TimeSpan.FromSeconds(3);
             _sensorTimer.Tick += SensorTimer_Tick;
             _sensorTimer.Start();
+
+            // Makes sure the sensor's USB driver is installed on THIS PC — a fresh install only
+            // needs this once (it triggers a single Windows permission prompt); every launch after
+            // that, the check is instant and silent. Runs off the UI thread since it may briefly
+            // block on that prompt.
+            Task.Run(() => DriverInstaller.EnsureInstalled());
         }
 
         // Hook keyboard shortcuts onto the host Window (a UserControl doesn't get top-level
@@ -135,6 +149,13 @@ namespace DentalX
                 e.Handled = true;
                 return;
             }
+            if (e.Key == Key.Escape && _toothMode)
+            {
+                ExitToothMode();
+                txtStatus.Text = "Tooth Length off";
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Space) { ToggleOriginalEnhanced(); e.Handled = true; }
             else if (e.Key == Key.I && !IsTextBoxFocused()) { btnInvert_Click(sender, e); e.Handled = true; }
             else if (e.Key == Key.R && !IsTextBoxFocused()) { btnRotate_Click(sender, e); e.Handled = true; }
@@ -164,6 +185,11 @@ namespace DentalX
 
         private void Viewer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (_toothMode) // before the double-click check: two quick clicks are crown + apex here
+            {
+                HandleToothClick(e);
+                return;
+            }
             if (e.ClickCount == 2)
             {
                 OpenFullZoom();
@@ -200,6 +226,7 @@ namespace DentalX
         // cleanly to the database.
         private void btnMeasure_Click(object sender, RoutedEventArgs e)
         {
+            ExitToothMode(); // one click-tool at a time
             bool turningOn = measureControls.Visibility != Visibility.Visible;
             measureControls.Visibility = turningOn ? Visibility.Visible : Visibility.Collapsed;
             btnMeasure.Background = turningOn ? (Brush)FindResource("BrAccentDim") : Brushes.Transparent;
@@ -404,7 +431,7 @@ namespace DentalX
             System.Windows.Point p3, bool hasP3, string label)
         {
             var v = new MeasureVisual { Kind = kind, ToothNumber = tooth, P1 = p1, P2 = p2, P3 = p3, HasP3 = hasP3 };
-            Brush stroke = kind == "Calibrate" ? Brushes.LimeGreen : Brushes.Yellow;
+            Brush stroke = kind == "Calibrate" ? Brushes.LimeGreen : kind == "AutoWidth" ? ToothWidthBrush : Brushes.Yellow;
 
             v.Line1 = new System.Windows.Shapes.Line
             {
@@ -471,6 +498,7 @@ namespace DentalX
                 if (index == 1) v.P1 = pixelPt;
                 else if (index == 2) v.P2 = pixelPt;
                 else v.P3 = pixelPt;
+                v.Estimated = false; // hand-adjusted → no longer an estimate
                 RecomputeMeasureLabel(v);
                 RepositionVisual(v);
                 e.Handled = true;
@@ -500,6 +528,11 @@ namespace DentalX
             if (v.Kind == "Calibrate") return; // confirmation text is fixed at the calibrated value
 
             double dx = v.P2.X - v.P1.X, dy = v.P2.Y - v.P1.Y;
+            if (v.Kind is "AutoLength" or "AutoWidth")
+            {
+                v.Label.Text = ToothLabel(v.Kind, Math.Sqrt(dx * dx + dy * dy), v.Estimated);
+                return;
+            }
             string value = FormatMeasurement(Math.Sqrt(dx * dx + dy * dy));
             v.Label.Text = v.Kind == "ToothLength"
                 ? (v.ToothNumber > 0 ? $"Tooth {v.ToothNumber}: {value} (radiographic)" : $"Tooth Length: {value} (radiographic)")
@@ -581,6 +614,7 @@ namespace DentalX
         private void LoadMeasurementsForCurrentImage()
         {
             ClearAllMeasureVisuals();
+            ClearPendingTooth(); // a half-placed tooth belongs to the previous image
             if (string.IsNullOrEmpty(currentImagePath)) return;
             foreach (var m in db.GetMeasurementsForImage(currentImagePath))
             {
@@ -588,12 +622,181 @@ namespace DentalX
                     new System.Windows.Point(m.X1, m.Y1), new System.Windows.Point(m.X2, m.Y2),
                     new System.Windows.Point(m.X3, m.Y3), m.HasThirdPoint, m.ValueText);
                 visual.DbId = m.Id;
+                visual.Estimated = m.ValueText.Contains('~');
             }
         }
+
+        // ═══ TOOTH LENGTH TOOL ═══
+        // Clicking 🦷 Tooth Length auto-detects the teeth (ToothDetector) and draws, for each,
+        // a length line (yellow, crown tip → apex) and a crown breadth line (pink), all marked
+        // "~" until the dentist drags them. Auto-detection is an estimate and misses teeth, so
+        // while the tool is on the dentist can also click a crown tip, then its apex, to add one:
+        // that length is exactly what was clicked, and its breadth is found automatically.
+        // All lines are normal measurements — draggable, right-click to remove, saved with the image.
+        private void btnToothLength_Click(object sender, RoutedEventArgs e)
+        {
+            if (_toothMode) { ExitToothMode(); txtStatus.Text = "Tooth Length off"; return; }
+            if (imgDisplay.Source == null) { MessageBox.Show("Load or capture an image first."); return; }
+
+            // one click-tool at a time
+            if (measureControls.Visibility == Visibility.Visible) btnMeasure_Click(sender, e);
+            if (_cropMode) btnCrop_Click(sender, e);
+            if (_annotateMode) btnAnnotate_Click(sender, e);
+
+            _toothMode = true;
+            btnToothLength.Content = "🦷 Done";
+            viewerBorder.Cursor = Cursors.Cross;
+            txtStatus.Text = "Tooth Length — click a CROWN TIP, then its ROOT APEX to add a tooth  (Esc to finish)";
+
+            // auto-detect only on an image that has no tooth lines yet, so reopening the tool
+            // doesn't stack duplicates on top of lines already checked
+            if (!_measureVisuals.Any(v => v.Kind is "AutoLength" or "AutoWidth")) RunToothAutoDetect();
+        }
+
+        private void ExitToothMode()
+        {
+            if (!_toothMode) return;
+            _toothMode = false;
+            ClearPendingTooth();
+            btnToothLength.Content = "🦷 Tooth Length";
+            viewerBorder.Cursor = Cursors.Arrow;
+        }
+
+        private void ClearPendingTooth()
+        {
+            _pendingToothPoints.Clear();
+            if (_pendingToothMarker != null) { viewerCanvas.Children.Remove(_pendingToothMarker); _pendingToothMarker = null; }
+        }
+
+        private void HandleToothClick(MouseButtonEventArgs e)
+        {
+            if (imgDisplay.Source is not BitmapSource src) return;
+            double scaleToPixels = src.PixelWidth / Math.Max(imgDisplay.ActualWidth, 1);
+            var imagePt = e.GetPosition(imgDisplay);
+            var pixelPt = new System.Windows.Point(imagePt.X * scaleToPixels, imagePt.Y * scaleToPixels);
+            if (pixelPt.X < 0 || pixelPt.Y < 0 || pixelPt.X >= src.PixelWidth || pixelPt.Y >= src.PixelHeight) return;
+
+            _pendingToothPoints.Add(pixelPt);
+            if (_pendingToothPoints.Count == 1)
+            {
+                // mark the crown tip until the apex is clicked
+                var c = e.GetPosition(viewerCanvas);
+                _pendingToothMarker = new System.Windows.Shapes.Ellipse
+                {
+                    Width = 10, Height = 10, Fill = Brushes.Yellow, IsHitTestVisible = false,
+                    HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(c.X - 5, c.Y - 5, 0, 0)
+                };
+                viewerCanvas.Children.Add(_pendingToothMarker);
+                txtStatus.Text = "Tooth Length — now click the ROOT APEX";
+                return;
+            }
+
+            var crown = _pendingToothPoints[0];
+            var apex = _pendingToothPoints[1];
+            ClearPendingTooth();
+            FinalizeTooth(src, crown, apex);
+        }
+
+        private void FinalizeTooth(BitmapSource src, System.Windows.Point crown, System.Windows.Point apex)
+        {
+            double len = (apex - crown).Length;
+            if (len < 10) { txtStatus.Text = "Crown tip and apex are too close — click again"; return; }
+
+            var length = CreateMeasureVisual("AutoLength", 0, crown, apex, default, false, ToothLabel("AutoLength", len, false));
+            length.DbId = SaveLineMeasurement(length);
+
+            // breadth on the image as shown (the preset the dentist is looking at)
+            (OpenCvSharp.Point2d A, OpenCvSharp.Point2d B)? breadth;
+            using (var mat = ImageEnhancer.BitmapSourceToMat(src))
+                breadth = ToothMeasure.FindCrownBreadth(mat, new OpenCvSharp.Point2d(crown.X, crown.Y), new OpenCvSharp.Point2d(apex.X, apex.Y));
+
+            string lenText = length.Label.Text;
+            if (breadth == null)
+            {
+                txtStatus.Text = $"Tooth: {lenText} — crown breadth not found (edges unclear); use Measure → Distance. Next crown tip, or Esc.";
+                return;
+            }
+            var a = new System.Windows.Point(breadth.Value.A.X, breadth.Value.A.Y);
+            var b = new System.Windows.Point(breadth.Value.B.X, breadth.Value.B.Y);
+            var width = CreateMeasureVisual("AutoWidth", 0, a, b, default, false, ToothLabel("AutoWidth", (b - a).Length, true));
+            width.Estimated = true;
+            width.DbId = SaveLineMeasurement(width);
+
+            txtStatus.Text = $"Tooth: {lenText}, {width.Label.Text} — drag any end to adjust. Next crown tip, or Esc to finish.";
+        }
+
+        // Auto-detect teeth (ToothDetector: finds, measures and validates them) and draw
+        // length + breadth for each, marked "~" (estimate) for the dentist to check.
+        private async void RunToothAutoDetect()
+        {
+            if (imgDisplay.Source is not BitmapSource src) return;
+            txtStatus.Text = "Detecting teeth...";
+            try
+            {
+                src.Freeze();
+                var found = await Task.Run(() =>
+                {
+                    using var mat = ImageEnhancer.BitmapSourceToMat(src);
+                    return ToothDetector.Detect(mat);
+                });
+                if (!_toothMode || !ReferenceEquals(src, imgDisplay.Source)) return; // tool closed / image changed
+
+                foreach (var t in found)
+                {
+                    var crown = new System.Windows.Point(t.Crown.X, t.Crown.Y);
+                    var apex = new System.Windows.Point(t.Apex.X, t.Apex.Y);
+                    var len = CreateMeasureVisual("AutoLength", 0, crown, apex, default, false, ToothLabel("AutoLength", (apex - crown).Length, true));
+                    len.Estimated = true;
+                    len.DbId = SaveLineMeasurement(len);
+
+                    var a = new System.Windows.Point(t.WidthA.X, t.WidthA.Y);
+                    var b = new System.Windows.Point(t.WidthB.X, t.WidthB.Y);
+                    var wid = CreateMeasureVisual("AutoWidth", 0, a, b, default, false, ToothLabel("AutoWidth", (b - a).Length, true));
+                    wid.Estimated = true;
+                    wid.DbId = SaveLineMeasurement(wid);
+                }
+                txtStatus.Text = found.Count == 0
+                    ? "No teeth detected automatically — click a CROWN TIP, then its ROOT APEX to measure  (Esc to finish)"
+                    : $"Detected {found.Count} tooth/teeth — check each: drag ends to adjust, right-click wrong lines. Click crown tip → apex to add a missed tooth.";
+            }
+            catch (Exception ex)
+            {
+                txtStatus.Text = $"Tooth detection error: {ex.Message} — click crown tip → apex to measure";
+            }
+        }
+
+        // 🧹 Clear Lengths: removes every tooth length/breadth line on this image (and its DB rows)
+        private void btnToothClear_Click(object sender, RoutedEventArgs e)
+        {
+            var toothLines = _measureVisuals.Where(v => v.Kind is "AutoLength" or "AutoWidth").ToList();
+            if (toothLines.Count == 0) { txtStatus.Text = "No tooth lines to clear"; return; }
+            if (MessageBox.Show($"Remove all {toothLines.Count} tooth length/breadth lines from this image?", "Clear Lengths",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+            foreach (var v in toothLines) RemoveMeasureVisual(v);
+            ClearPendingTooth();
+            txtStatus.Text = $"Cleared {toothLines.Count} tooth lines";
+        }
+
+        private int SaveLineMeasurement(MeasureVisual v) => db.SaveMeasurement(new Measurement
+        {
+            ImagePath = currentImagePath,
+            Type = v.Kind,
+            ToothNumber = v.ToothNumber,
+            X1 = v.P1.X, Y1 = v.P1.Y, X2 = v.P2.X, Y2 = v.P2.Y,
+            HasThirdPoint = false,
+            ValueText = v.Label.Text
+        });
+
+        // "L 17.30 mm" / "W ~6.80 mm" — "~" while it's an automatic estimate
+        private string ToothLabel(string kind, double pixelDist, bool estimated)
+            => $"{(kind == "AutoWidth" ? "W" : "L")} {(estimated ? "~" : "")}{FormatMeasurement(pixelDist)}";
 
         // ═══ CROP TOOL — genuinely crops the pixel data via CroppedBitmap, not just visual ═══
         private void btnCrop_Click(object sender, RoutedEventArgs e)
         {
+            ExitToothMode(); // one click-tool at a time
             _cropMode = !_cropMode;
             ClearCropOverlay();
             btnCrop.Background = _cropMode ? (Brush)FindResource("BrAccentDim") : Brushes.Transparent;
@@ -701,6 +904,7 @@ namespace DentalX
                 cropped.Freeze();
                 imgDisplay.Source = cropped;
                 originalImage = cropped;
+                ResetEnhancementState(); // new original → old preset/slider settings don't carry over
                 enhancedImage = null;
                 ClearAllMeasureVisuals(); // old measurements were in the pre-crop pixel space
                 ResetViewTransforms();
@@ -728,6 +932,7 @@ namespace DentalX
         // Overlay only (like Measure) — not baked into exported/saved image files. ═══
         private void btnAnnotate_Click(object sender, RoutedEventArgs e)
         {
+            ExitToothMode(); // one click-tool at a time
             _annotateMode = !_annotateMode;
             btnAnnotate.Background = _annotateMode ? (Brush)FindResource("BrAccentDim") : Brushes.Transparent;
             txtStatus.Text = _annotateMode
@@ -846,8 +1051,7 @@ namespace DentalX
             {
                 isWindowLevel = false;
                 viewerBorder.ReleaseMouseCapture();
-                viewerBorder.Cursor = Cursors.Arrow;
-                btnApplySliders_Click(sender, e);
+                viewerBorder.Cursor = Cursors.Arrow; // sliders already rendered live during the drag
             }
         }
 
@@ -1078,6 +1282,7 @@ namespace DentalX
                 if (r.Success)
                 {
                     originalImage = r.Image;
+                    ResetEnhancementState(); // new original → old preset/slider settings don't carry over
                     enhancedImage = null;
                     imgDisplay.Source = r.Image;
                     ResetViewTransforms();
@@ -1211,11 +1416,6 @@ namespace DentalX
             imgFullZoom.Source = null;
         }
 
-        private void btnToolPan_Click(object sender, RoutedEventArgs e)
-        {
-            txtStatus.Text = "Pan — left-click drag to move image";
-        }
-
         // =================================================================
         //  ENHANCEMENT PRESETS — ALL ASYNC + try/finally
         // =================================================================
@@ -1253,11 +1453,7 @@ namespace DentalX
                     res.Freeze();
                 });
 
-                if (res != null)
-                {
-                    imgDisplay.Source = res;
-                    enhancedImage = res;
-                }
+                if (res != null) SetPresetBase(res, null, name); // sliders now fine-tune this preset
                 txtStatus.Text = $"{name} applied — Space to compare";
             }
             catch (Exception ex)
@@ -1280,7 +1476,9 @@ namespace DentalX
             txtStatus.Text = "Inverting...";
             try
             {
-                var src = (imgDisplay.Source as BitmapSource) ?? originalImage!;
+                // Inverts the slider base (preset result, or the original), so slider
+                // adjustments and any colour map stay on top; pressing it twice undoes it.
+                var src = _presetBase ?? originalImage!;
                 src.Freeze();
                 BitmapSource? res = null;
 
@@ -1292,11 +1490,7 @@ namespace DentalX
                     res.Freeze();
                 });
 
-                if (res != null)
-                {
-                    imgDisplay.Source = res;
-                    enhancedImage = res;
-                }
+                if (res != null) SetPresetBase(res, _presetPost, _presetName == "" ? "Inverted" : _presetName + " + Invert");
                 txtStatus.Text = "Inverted (Space for original)";
             }
             catch (Exception ex)
@@ -1331,18 +1525,14 @@ namespace DentalX
 
                 await Task.Run(() =>
                 {
+                    // Base = the grey enhanced stage; the colour map runs after the sliders
                     using var m = ImageEnhancer.BitmapSourceToMat(src);
                     using var enhanced = ImageEnhancer.FullEnhance(m, 3.0, 0.6, 0.8);
-                    using var colored = ImageEnhancer.ApplyColorMap(enhanced, map);
-                    res = ImageEnhancer.MatToBitmapSource(colored);
+                    res = ImageEnhancer.MatToBitmapSource(enhanced);
                     res.Freeze();
                 });
 
-                if (res != null)
-                {
-                    imgDisplay.Source = res;
-                    enhancedImage = res;
-                }
+                if (res != null) SetPresetBase(res, g => ImageEnhancer.ApplyColorMap(g, map), name);
                 txtStatus.Text = $"{name} applied";
             }
             catch (Exception ex)
@@ -1374,17 +1564,11 @@ namespace DentalX
                     using var m = ImageEnhancer.BitmapSourceToMat(src);
                     using var enhanced = ImageEnhancer.FullEnhance(m, 3.0, 0.5, 0.8);
                     using var edges = ImageEnhancer.ApplyEdgeEnhance(enhanced, 0.5);
-                    using var colored = new Mat();
-                    Cv2.ApplyColorMap(edges, colored, ColormapTypes.Cividis);
-                    res = ImageEnhancer.MatToBitmapSource(colored);
+                    res = ImageEnhancer.MatToBitmapSource(edges);
                     res.Freeze();
                 });
 
-                if (res != null)
-                {
-                    imgDisplay.Source = res;
-                    enhancedImage = res;
-                }
+                if (res != null) SetPresetBase(res, g => ImageEnhancer.ApplyColorMap(g, ColormapTypes.Cividis), "Edge map");
                 txtStatus.Text = "Edge map — highlights boundaries and cracks";
             }
             catch (Exception ex)
@@ -1398,11 +1582,133 @@ namespace DentalX
         }
 
         // =================================================================
-        //  SLIDERS — Live labels + ASYNC Apply + try/finally
+        //  SLIDERS — live, fine-tuning ON TOP of the active preset
+        //
+        //  A preset/filter stores its result as the slider BASE (_presetBase); colour maps
+        //  store their grey stage plus the colour map as a final step (_presetPost), so
+        //  sliders adjust the grey image and the colours are re-applied after. Moving a slider
+        //  re-renders base → sliders → post after a short debounce; only the latest values are
+        //  rendered, and a result for an image that has since changed is thrown away.
         // =================================================================
+        private BitmapSource? _presetBase;          // null = no preset → sliders work on originalImage
+        private Func<Mat, Mat>? _presetPost;        // e.g. colour map, applied after the sliders
+        private string _presetName = "";
+        private bool _suppressSliderRender;         // set while Reset/new-image move the sliders
+        private bool _rendering, _renderPending;
+        private System.Windows.Threading.DispatcherTimer? _sliderDebounce;
+
         private void EnhSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             UpdateSliderLabels();
+            if (_suppressSliderRender || originalImage == null) return;
+
+            if (_sliderDebounce == null)
+            {
+                _sliderDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+                _sliderDebounce.Tick += (s, a) => { _sliderDebounce!.Stop(); RenderEnhancement(); };
+            }
+            _sliderDebounce.Stop();
+            _sliderDebounce.Start();
+        }
+
+        private bool SlidersAtDefault =>
+            Math.Abs(sliderBrightness.Value) <= 1 && sliderContrast.Value <= 0.1 &&
+            Math.Abs(sliderGamma.Value - 1.0) <= 0.01 && sliderSharp.Value <= 0.05;
+
+        // Sliders back to defaults WITHOUT triggering a render
+        private void ResetSlidersSilently()
+        {
+            _sliderDebounce?.Stop();
+            _suppressSliderRender = true;
+            sliderBrightness.Value = 0;
+            sliderContrast.Value = 0;
+            sliderGamma.Value = 1.0;
+            sliderSharp.Value = 0;
+            _suppressSliderRender = false;
+            UpdateSliderLabels();
+        }
+
+        // Called whenever a different image becomes the original (load, capture, gallery, crop,
+        // clear) — old preset and slider settings must not carry over to it.
+        private void ResetEnhancementState()
+        {
+            ResetSlidersSilently();
+            _presetBase = null;
+            _presetPost = null;
+            _presetName = "";
+        }
+
+        // A preset/filter finished: make it the slider base and show it (with any slider
+        // adjustments already dialled in re-applied on top).
+        private void SetPresetBase(BitmapSource baseImg, Func<Mat, Mat>? post, string name)
+        {
+            _presetBase = baseImg;
+            _presetPost = post;
+            _presetName = name;
+            RenderEnhancement();
+        }
+
+        // base → sliders → post, rendered off the UI thread; latest values win.
+        private async void RenderEnhancement()
+        {
+            if (_rendering) { _renderPending = true; return; }
+            _rendering = true;
+            try
+            {
+                do
+                {
+                    _renderPending = false;
+                    var src = _presetBase ?? originalImage;
+                    if (src == null) return;
+
+                    // Nothing to do: show the base (or the original) directly
+                    if (SlidersAtDefault && _presetPost == null)
+                    {
+                        imgDisplay.Source = src;
+                        enhancedImage = _presetBase; // null when back to the original
+                        txtStatus.Text = _presetBase != null ? $"{_presetName} — Space to compare" : "Original";
+                        continue;
+                    }
+
+                    double br = sliderBrightness.Value, cl = sliderContrast.Value;
+                    double gm = sliderGamma.Value, sh = sliderSharp.Value;
+                    var post = _presetPost;
+                    src.Freeze();
+
+                    BitmapSource res = await Task.Run(() =>
+                    {
+                        Mat cur = ImageEnhancer.BitmapSourceToMat(src);
+                        void Step(Func<Mat, Mat> f) { var next = f(cur); cur.Dispose(); cur = next; }
+
+                        if (cl > 0.1) Step(m => ImageEnhancer.ApplyCLAHE(m, cl));
+                        if (sh > 0.05) Step(m => ImageEnhancer.ApplySharpen(m, 1.5, sh));
+                        if (Math.Abs(gm - 1.0) > 0.01) Step(m => ImageEnhancer.ApplyGamma(m, gm));
+                        if (Math.Abs(br) > 1) Step(m => ImageEnhancer.ApplyBrightness(m, br));
+                        if (post != null) Step(post);
+
+                        var bmp = ImageEnhancer.MatToBitmapSource(cur);
+                        cur.Dispose();
+                        return bmp;
+                    });
+
+                    // Image or preset changed while rendering → this result is stale
+                    if (!ReferenceEquals(src, _presetBase ?? originalImage)) continue;
+
+                    imgDisplay.Source = res;
+                    enhancedImage = res;
+                    string adj = SlidersAtDefault ? "" : $"  ·  CLAHE {cl:F1}  Sharp {sh:F1}  Gamma {gm:F2}  Bright {br:F0}";
+                    txtStatus.Text = $"{(_presetName == "" ? "Adjusted" : _presetName)}{adj} — Space to compare";
+                }
+                while (_renderPending);
+            }
+            catch (Exception ex)
+            {
+                txtStatus.Text = $"Slider error: {ex.Message}";
+            }
+            finally
+            {
+                _rendering = false;
+            }
         }
 
         private void UpdateSliderLabels()
@@ -1414,98 +1720,10 @@ namespace DentalX
             txtSharpVal.Text = $"{sliderSharp.Value:F1}";
         }
 
-        private async void btnApplySliders_Click(object sender, RoutedEventArgs e)
-        {
-            if (!EnsureImage() || isProcessing) return;
-            isProcessing = true;
-            txtStatus.Text = "Applying adjustments...";
-
-            double br = sliderBrightness.Value;
-            double cl = sliderContrast.Value;
-            double gm = sliderGamma.Value;
-            double sh = sliderSharp.Value;
-
-            try
-            {
-                var src = originalImage!;
-                src.Freeze();
-                BitmapSource? res = null;
-
-                await Task.Run(() =>
-                {
-                    using var mat = ImageEnhancer.BitmapSourceToMat(src);
-                    Mat cur = mat.Clone(); // Already grayscale from BitmapSourceToMat
-
-                    if (cl > 0.1)
-                    {
-                        using var claheObj = Cv2.CreateCLAHE(cl, new OpenCvSharp.Size(8, 8));
-                        var temp = new Mat();
-                        claheObj.Apply(cur, temp);
-                        cur.Dispose();
-                        cur = temp;
-                    }
-
-                    if (sh > 0.05)
-                    {
-                        var blurred = new Mat();
-                        var sharpened = new Mat();
-                        Cv2.GaussianBlur(cur, blurred, new OpenCvSharp.Size(0, 0), 1.5);
-                        Cv2.AddWeighted(cur, 1.0 + sh, blurred, -sh, 0, sharpened);
-                        blurred.Dispose();
-                        cur.Dispose();
-                        cur = sharpened;
-                    }
-
-                    if (Math.Abs(gm - 1.0) > 0.01)
-                    {
-                        byte[] lut = new byte[256];
-                        for (int i = 0; i < 256; i++)
-                            lut[i] = (byte)Math.Clamp(Math.Pow(i / 255.0, 1.0 / gm) * 255, 0, 255);
-                        using var lutMat = new Mat(1, 256, MatType.CV_8U);
-                        lutMat.SetArray(lut);
-                        var temp = new Mat();
-                        Cv2.LUT(cur, lutMat, temp);
-                        cur.Dispose();
-                        cur = temp;
-                    }
-
-                    if (Math.Abs(br) > 1)
-                    {
-                        var temp = new Mat();
-                        cur.ConvertTo(temp, -1, 1.0, br);
-                        cur.Dispose();
-                        cur = temp;
-                    }
-
-                    res = ImageEnhancer.MatToBitmapSource(cur);
-                    res.Freeze();
-                    cur.Dispose();
-                });
-
-                if (res != null)
-                {
-                    imgDisplay.Source = res;
-                    enhancedImage = res;
-                }
-                txtStatus.Text = $"CLAHE:{cl:F1} Sharp:{sh:F1} Gamma:{gm:F2} Bright:{br:F0}";
-            }
-            catch (Exception ex)
-            {
-                txtStatus.Text = $"Slider error: {ex.Message}";
-            }
-            finally
-            {
-                isProcessing = false;
-            }
-        }
-
+        // Reset = sliders AND preset back to the original image
         private void btnResetSliders_Click(object sender, RoutedEventArgs e)
         {
-            sliderBrightness.Value = 0;
-            sliderContrast.Value = 0;
-            sliderGamma.Value = 1.0;
-            sliderSharp.Value = 0;
-            UpdateSliderLabels();
+            ResetEnhancementState();
 
             if (originalImage != null)
             {
@@ -1559,22 +1777,6 @@ namespace DentalX
             txtStatus.Text = currentModality == "All"
                 ? "Showing all images"
                 : $"Filtered to {btn.Content} images";
-        }
-
-        // =================================================================
-        //  AI ANALYSIS (placeholder)
-        // =================================================================
-        private void btnAIAnalysis_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show(
-                "AI Detection coming in future update.\n\n" +
-                "• Caries detection with color overlay\n" +
-                "• Bone loss measurement\n" +
-                "• Periapical radiolucency detection\n" +
-                "• Calculus identification\n\n" +
-                "Requires: trained ONNX model + ONNX Runtime",
-                "AI Analysis — Coming Soon",
-                MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         // =================================================================
@@ -1680,6 +1882,7 @@ namespace DentalX
                     string pathToDelete = currentImagePath;
                     imgDisplay.Source = null;
                     originalImage = null;
+                    ResetEnhancementState(); // new original → old preset/slider settings don't carry over
                     enhancedImage = null;
                     currentImagePath = "";
                     ClearAllMeasureVisuals();
@@ -1799,6 +2002,7 @@ namespace DentalX
                         var img = LoadBitmapUnlocked(path);
                         imgDisplay.Source = img;
                         originalImage = img;
+                        ResetEnhancementState(); // new original → old preset/slider settings don't carry over
                         enhancedImage = null;
                         currentImagePath = path;
                         ResetViewTransforms();
@@ -1853,9 +2057,13 @@ namespace DentalX
             if (path.EndsWith(".tif"))
                 encoder = new TiffBitmapEncoder { Compression = TiffCompressOption.None };
             else if (path.EndsWith(".jpg"))
+            {
                 encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+                if (source.Format == PixelFormats.Gray16) // JPEG is 8-bit only
+                    source = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
+            }
             else
-                encoder = new PngBitmapEncoder();
+                encoder = new PngBitmapEncoder(); // keeps 16-bit grey for captures
 
             encoder.Frames.Add(BitmapFrame.Create(source));
             using var fs = new FileStream(path, FileMode.Create);
@@ -1870,7 +2078,9 @@ namespace DentalX
             var bmp = new BitmapImage();
             bmp.BeginInit();
             bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            // PreservePixelFormat: without it WPF decodes 16-bit grey captures as 8-bit Bgr32,
+            // silently throwing away the sensor's extra grey levels before any enhancement.
+            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache | BitmapCreateOptions.PreservePixelFormat;
             bmp.UriSource = new Uri(path);
             bmp.EndInit();
             bmp.Freeze();
@@ -1931,31 +2141,6 @@ namespace DentalX
             }
         }
 
-        private void btnTestCapture_Click(object sender, RoutedEventArgs e)
-        {
-            if (!sensor.IsConnected) { MessageBox.Show("Connect sensor first."); return; }
-            txtStatus.Text = "Test capture (no X-ray needed)...";
-
-            var w = new BackgroundWorker();
-            w.DoWork += (s, a) => a.Result = sensor.TestCapture();
-            w.RunWorkerCompleted += (s, a) =>
-            {
-                var r = (CaptureResult)a.Result!;
-                if (r.Success)
-                {
-                    imgDisplay.Source = r.Image;
-                    originalImage = r.Image;
-                    txtStatus.Text = $"Test capture done — {r.Width}×{r.Height} (sensor noise without X-ray is normal)";
-                }
-                else
-                {
-                    MessageBox.Show(r.Error);
-                    txtStatus.Text = "Test failed: " + r.Error;
-                }
-            };
-            w.RunWorkerAsync();
-        }
-
         private void LoadPatientList()
         {
             lstPatients.Items.Clear();
@@ -1974,9 +2159,28 @@ namespace DentalX
             if (dlg.ShowDialog() == true)
             {
                 currentImagePath = dlg.FileName;
-                var img = LoadBitmapUnlocked(currentImagePath);
+                BitmapSource img = LoadBitmapUnlocked(currentImagePath);
+
+                // A raw sensor file (raw_*.tif, linear dark-subtracted 16-bit) is converted exactly
+                // like a fresh capture and saved into the captures folder as a normal PNG — so old
+                // raws can be re-processed, and the raw file itself is never touched.
+                if (img.Format == PixelFormats.Gray16 &&
+                    Path.GetFileName(currentImagePath).StartsWith("raw_", StringComparison.OrdinalIgnoreCase))
+                {
+                    var raw = new ushort[img.PixelWidth * img.PixelHeight];
+                    img.CopyPixels(raw, img.PixelWidth * 2, 0);
+                    img = ImageEnhancer.RawToDisplayBitmap(raw, img.PixelWidth, img.PixelHeight, out _);
+
+                    string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DentalX_Captures");
+                    string stamp = Path.GetFileNameWithoutExtension(currentImagePath).Substring(4); // "20261014_160846"
+                    string modPrefix = currentModality == "All" ? "intraoral" : currentModality.ToLower();
+                    currentImagePath = PatientFolders.UniqueDestination(dir, $"{modPrefix}_{stamp}.png");
+                    SaveBitmapSource(img, currentImagePath);
+                }
+
                 imgDisplay.Source = img;
                 originalImage = img;
+                ResetEnhancementState(); // new original → old preset/slider settings don't carry over
                 enhancedImage = null;
                 ResetViewTransforms();
                 LoadMeasurementsForCurrentImage();
@@ -2009,36 +2213,82 @@ namespace DentalX
             }
 
             string modality = currentModality == "All" ? "Intraoral" : currentModality;
-            string attachedPath = currentImagePath;
+            string desktopFolder = PatientFolders.GetDesktopPatientFolder(patient.Id, patient.Name);
+            string appDataFolder = PatientFolders.GetAppDataPatientFolder(patient.Id, patient.Name);
+            bool showingEnhanced = enhancedImage != null && imgDisplay.Source == enhancedImage
+                                   && !ReferenceEquals(enhancedImage, _lastAttachedEnhanced);
+            var saved = new List<string>();
 
-            // Attaching is the moment the app first learns which patient an image belongs to
-            // (capture happens before that's known), so this is where the file moves out of the
-            // flat capture staging area into that patient's own folder — plus a redundant shadow
-            // copy in app-data, kept in sync with it.
-            try
+            // 1) ORIGINAL — the file on disk at currentImagePath is the raw capture and is NEVER
+            // written to here. Attaching is the moment the app first learns which patient an image
+            // belongs to, so it's brought into that patient's folder once (plus an app-data shadow
+            // copy). If it's already there (attached earlier), it's left untouched — this is what
+            // stops a later "enhance → attach" from overwriting the original.
+            if (!PatientFolders.IsInsideFolder(currentImagePath, desktopFolder))
             {
-                if (File.Exists(currentImagePath))
+                string attachedPath = currentImagePath;
+                try
                 {
-                    string fileName = Path.GetFileName(currentImagePath);
-                    string desktopFolder = PatientFolders.GetDesktopPatientFolder(patient.Id, patient.Name);
-                    string desktopDest = PatientFolders.UniqueDestination(desktopFolder, fileName);
-                    File.Move(currentImagePath, desktopDest);
-                    attachedPath = desktopDest;
-                    currentImagePath = desktopDest;
+                    if (File.Exists(currentImagePath))
+                    {
+                        string fileName = Path.GetFileName(currentImagePath);
+                        string desktopDest = PatientFolders.UniqueDestination(desktopFolder, fileName);
 
-                    string appDataFolder = PatientFolders.GetAppDataPatientFolder(patient.Id, patient.Name);
-                    string appDataDest = PatientFolders.UniqueDestination(appDataFolder, fileName);
-                    File.Copy(desktopDest, appDataDest, overwrite: false);
+                        // Captures in the flat staging folder are moved; a file loaded from anywhere
+                        // else (USB stick, another folder) is copied, so the user's source isn't removed.
+                        string stagingDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "DentalX_Captures");
+                        bool isStaged = string.Equals(Path.GetFullPath(Path.GetDirectoryName(currentImagePath)!).TrimEnd('\\'),
+                                                      Path.GetFullPath(stagingDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                        if (isStaged) File.Move(currentImagePath, desktopDest);
+                        else File.Copy(currentImagePath, desktopDest, overwrite: false);
+
+                        attachedPath = desktopDest;
+                        currentImagePath = desktopDest;
+
+                        File.Copy(desktopDest, PatientFolders.UniqueDestination(appDataFolder, fileName), overwrite: false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Attached, but couldn't move the file into the patient folder:\n{ex.Message}");
+                }
+
+                db.AddExamination(patient.Id, attachedPath, modality, "Attached from Imaging");
+                saved.Add("original");
+            }
+
+            // 2) ENHANCED — sliders/presets only change the on-screen preview, so if that's what's
+            // displayed, save it as a SEPARATE file in <patient folder>\Enhanced\<name>-enhanced.png,
+            // recorded as its own examination, so both versions show in the patient's history.
+            if (showingEnhanced)
+            {
+                try
+                {
+                    string enhancedName = PatientFolders.EnhancedFileName(Path.GetFileName(currentImagePath));
+                    string enhancedDest = PatientFolders.UniqueDestination(PatientFolders.GetEnhancedFolder(desktopFolder), enhancedName);
+                    SaveBitmapSource(enhancedImage!, enhancedDest);
+                    File.Copy(enhancedDest,
+                        PatientFolders.UniqueDestination(PatientFolders.GetEnhancedFolder(appDataFolder), Path.GetFileName(enhancedDest)),
+                        overwrite: false);
+
+                    db.AddExamination(patient.Id, enhancedDest, modality, $"Enhanced version of {Path.GetFileName(currentImagePath)}");
+                    _lastAttachedEnhanced = enhancedImage;
+                    saved.Add("enhanced");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Couldn't save the enhanced image:\n{ex.Message}");
                 }
             }
-            catch (Exception ex)
+
+            if (saved.Count == 0)
             {
-                MessageBox.Show($"Attached, but couldn't move the file into the patient folder:\n{ex.Message}");
+                txtStatus.Text = $"Already saved to {patient.Name} — nothing new to attach";
+                return;
             }
 
-            db.AddExamination(patient.Id, attachedPath, modality, "Attached from Imaging");
             txtAttachedPatient.Text = $"✓ Attached to {patient.Name} (P-{patient.Id:D5})";
-            txtStatus.Text = $"Image attached to {patient.Name}";
+            txtStatus.Text = $"Saved {string.Join(" + ", saved)} image to {patient.Name}";
             LoadGalleryThumbnails();
         }
 

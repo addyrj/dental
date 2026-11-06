@@ -97,14 +97,13 @@ namespace DentalX
         }
 
         // ═══════════════════════════════════════════════════════════════
-        //  CAPTURE X-RAY — ALL 6 ISSUES FIXED:
+        //  CAPTURE X-RAY
         //
-        //  1. NORMALIZATION: 16-bit (0-4900) → full 0-65535 range
-        //  2. MODE CHECK: removed (was rejecting valid captures)
-        //  3. DARK SUBTRACTION: signed math prevents clipping artifacts
-        //  4. SAVE FORMAT: returns both normalized display + raw 16-bit
-        //  5. AUTO ENHANCEMENT: mild gamma applied for natural look
-        //  6. NO SUSPEND: removed USB_SuspendDevice between captures
+        //  DISPLAY CONVERSION: log + invert, windowed on percentiles of the
+        //  exposed pixels (see ImageEnhancer.RawToDisplay). Percentiles, not
+        //  absolute min/max, so a single dead (0) or blown-out (65535) pixel
+        //  can't wreck the contrast — that's what caused the old "too white"
+        //  and "too black" captures.
         // ═══════════════════════════════════════════════════════════════
         public CaptureResult Capture(
             byte mode = 0x01,
@@ -157,7 +156,8 @@ namespace DentalX
                 if ((long)len != ExpectedBuffer)
                     return CaptureResult.Fail($"Buffer: got {len}, expected {ExpectedBuffer}");
 
-                // ─── FIX 3: Signed dark subtraction (prevents clipping artifacts) ───
+                // ─── Signed dark subtraction ───
+                // Signed math prevents wrap-around clipping artifacts.
                 ushort[] raw = ExtractPixels(buf);
                 _lastPixels = new ushort[PixelCount];
                 for (int i = 0; i < PixelCount && i < raw.Length; i++)
@@ -167,47 +167,15 @@ namespace DentalX
                     _lastPixels[i] = val > 0 ? (ushort)val : (ushort)0;
                 }
 
-                // ─── FIX 1: Normalize 16-bit to full range ───
-                // Sensor outputs 0-4900 (typ), but Gray16 display expects 0-65535
-                // Without this, image displays at ~7.5% brightness (nearly black)
-                ushort minVal = ushort.MaxValue, maxVal = 0;
-                for (int i = 0; i < _lastPixels.Length; i++)
-                {
-                    if (_lastPixels[i] < minVal) minVal = _lastPixels[i];
-                    if (_lastPixels[i] > maxVal) maxVal = _lastPixels[i];
-                }
-
-                // ─── Flag if no real X-ray data (just noise, no actual exposure) ───
-                // Real X-ray signal is 500-4900 counts; pure sensor noise is 0-50.
-                // maxVal < 100 means the exposure never fired — image is noise only.
-                bool isNoiseOnly = maxVal < 100;
-
-                // Stretch contrast: map [minVal..maxVal] → [0..65535]
-                ushort[] displayPixels = new ushort[_lastPixels.Length];
-                double range = maxVal - minVal;
-                if (range < 1) range = 1; // prevent divide by zero
-
-                for (int i = 0; i < _lastPixels.Length; i++)
-                {
-                    double normalized = (_lastPixels[i] - minVal) / range; // 0.0 to 1.0
-
-                    // Linear stretch only — no gamma. Gamma 0.7 was artificially brightening
-                    // every capture (pushing midtones up), which is what made images look
-                    // washed-out/whitish. A straight min-max stretch reads as natural gray,
-                    // and the Enhance/CLAHE tools remain available if more contrast is wanted.
-
-                    displayPixels[i] = (ushort)Math.Clamp(normalized * 65535, 0, 65535);
-                }
-
-                // ─── Create display image (normalized + gamma) ───
+                // ─── RAW → DISPLAY: log + invert + window (see ImageEnhancer.RawToDisplay) ───
+                // Gives the standard radiograph look (air black, teeth white) and stays 16-bit.
+                var bmp = ImageEnhancer.RawToDisplayBitmap(_lastPixels, Width, Height, out ushort p99);
                 int stride = Width * 2;
-                var bmp = BitmapSource.Create(
-                    Width, Height, 96, 96,
-                    PixelFormats.Gray16, null,
-                    displayPixels, stride);
-                bmp.Freeze();
 
-                // ─── FIX 4: Also save raw 16-bit TIFF (preserves original data) ───
+                // Flag if no real X-ray data (99th percentile of signal; real X-ray signal >> 100)
+                bool isNoiseOnly = p99 < 100;
+
+                // ─── Save raw 16-bit TIFF (preserves original unprocessed data) ───
                 try
                 {
                     var rawDir = Path.Combine(
@@ -230,9 +198,6 @@ namespace DentalX
                 }
                 catch { /* raw save is optional, don't fail capture */ }
 
-                // ─── FIX 6: No USB_SuspendDevice between captures ───
-                // (was causing wake issues on rapid consecutive captures)
-
                 var result = CaptureResult.Ok(bmp, _lastPixels, Width, Height);
                 result.IsNoiseOnly = isNoiseOnly;
                 return result;
@@ -242,76 +207,6 @@ namespace DentalX
                 return CaptureResult.Fail($"Capture exception: {ex.Message}");
             }
         }
-
-
-
-
-// ═══ TEST CAPTURE — forces trigger without X-ray detection ═══
-public CaptureResult TestCapture()
-{
-    if (!IsConnected)
-        return CaptureResult.Fail("Not connected.");
-
-    try
-    {
-        CMOS_USB.USB_ResumeDevice(_handle);
-
-        CMOS_USB.UnitXrayImage param;
-        param.Mode = 0x01;
-        param.IntegParam.Xray_Incident_Threshold = 440;
-        param.IntegParam.Xray_Integration_End_Threshold = 437;
-        param.IntegParam.Integration_Time = 500;
-
-        byte[] buf = new byte[ALLOC_SIZE];
-
-        // ForceTrig bypasses photodiode — captures immediately
-        uint r = CMOS_USB.HPK_ForceTrigAndGetDummy(_handle, buf, out ulong len, ref param);
-
-        if (r != 0)
-            return CaptureResult.Fail($"Test capture error 0x{r:X4}");
-
-        ushort[] raw = ExtractPixels(buf);
-        _lastPixels = new ushort[PixelCount];
-        for (int i = 0; i < PixelCount && i < raw.Length; i++)
-        {
-            int dark = (_darkPixels != null && i < _darkPixels.Length) ? _darkPixels[i] : 0;
-            int val = raw[i] - dark;
-            _lastPixels[i] = val > 0 ? (ushort)val : (ushort)0;
-        }
-
-        // Normalize
-        ushort minVal = ushort.MaxValue, maxVal = 0;
-        for (int i = 0; i < _lastPixels.Length; i++)
-        {
-            if (_lastPixels[i] < minVal) minVal = _lastPixels[i];
-            if (_lastPixels[i] > maxVal) maxVal = _lastPixels[i];
-        }
-
-        ushort[] displayPixels = new ushort[_lastPixels.Length];
-        double range = maxVal - minVal;
-        if (range < 1) range = 1;
-
-        for (int i = 0; i < _lastPixels.Length; i++)
-        {
-            double normalized = (_lastPixels[i] - minVal) / range;
-            normalized = Math.Pow(normalized, 0.7);
-            displayPixels[i] = (ushort)Math.Clamp(normalized * 65535, 0, 65535);
-        }
-
-        int stride = Width * 2;
-        var bmp = BitmapSource.Create(Width, Height, 96, 96,
-            PixelFormats.Gray16, null, displayPixels, stride);
-        bmp.Freeze();
-
-        return CaptureResult.Ok(bmp, _lastPixels, Width, Height);
-    }
-    catch (Exception ex)
-    {
-        return CaptureResult.Fail($"Test error: {ex.Message}");
-    }
-}
-
-
 
         // ═══ ABORT ═══
         public void Abort()

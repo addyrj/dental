@@ -6,8 +6,8 @@
         <StackPanel Margin="24">
             <Grid Margin="0,0,0,4">
                 <TextBlock Text="Dashboard" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrText}"/>
-                <Button Content="📷 Go to Imaging" HorizontalAlignment="Right" Height="34" Padding="14,0" Cursor="Hand" Click="GoToImaging_Click"
-                        Background="#C13A44" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0">
+                <Button Content="📷 Imaging" HorizontalAlignment="Right" Height="34" Padding="14,0" Cursor="Hand" Click="GoToImaging_Click"
+                        Background="#008000" Foreground="White" FontSize="12" FontWeight="SemiBold" BorderThickness="0" Margin="0,0,5,0">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border Background="{TemplateBinding Background}" CornerRadius="6">
@@ -24,7 +24,7 @@
                 <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="16" Margin="0,0,12,0"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="📷" FontSize="20" Margin="0,0,0,8"/>
+                        <TextBlock Text="📷" FontSize="20" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
                         <TextBlock x:Name="txtStatToday" Text="0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource BrText}"/>
                         <TextBlock Text="Today's Captures" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,4,0,0"/>
                     </StackPanel>
@@ -32,7 +32,7 @@
                 <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="16" Margin="0,0,12,0"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="👤" FontSize="20" Margin="0,0,0,8"/>
+                        <TextBlock Text="👤" FontSize="20" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
                         <TextBlock x:Name="txtStatPatients" Text="0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource BrText}"/>
                         <TextBlock Text="Total Patients" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,4,0,0"/>
                     </StackPanel>
@@ -40,7 +40,7 @@
                 <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="16" Margin="0,0,12,0"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="🆕" FontSize="20" Margin="0,0,0,8"/>
+                        <TextBlock Text="🆕" FontSize="20" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
                         <TextBlock x:Name="txtStatNewPatients" Text="0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource BrText}"/>
                         <TextBlock Text="New Patients (7d)" FontSize="11" Foreground="{StaticResource BrTextMuted}" Margin="0,4,0,0"/>
                     </StackPanel>
@@ -48,7 +48,7 @@
                 <Border Background="{StaticResource BrBgPanel}" CornerRadius="10" Padding="16"
                         BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="🧠" FontSize="20" Margin="0,0,0,8"/>
+                        <TextBlock Text="🧠" FontSize="20" Foreground="{StaticResource BrText}" Margin="0,0,0,8"/>
                         <TextBlock x:Name="txtStatAI" Text="—" FontSize="26" FontWeight="Bold" Foreground="{StaticResource BrTextMuted}"/>
                         <TextBlock Text="AI Findings — model not connected" FontSize="11" Foreground="{StaticResource BrTextMuted}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                     </StackPanel>

@@ -44,6 +44,36 @@ namespace DentalX
             return folder;
         }
 
+        // Enhanced/processed versions live in a subfolder of the patient folder, so the original
+        // capture (the diagnostic record) is never overwritten and stays easy to tell apart.
+        public const string EnhancedSubfolder = "Enhanced";
+        public const string EnhancedSuffix = "-enhanced";
+
+        public static string GetEnhancedFolder(string patientFolder)
+        {
+            string folder = Path.Combine(patientFolder, EnhancedSubfolder);
+            Directory.CreateDirectory(folder);
+            return folder;
+        }
+
+        // "intraoral_20261016_101500.png" -> "intraoral_20261016_101500-enhanced.png". Strips an
+        // existing suffix first so re-enhancing an enhanced copy doesn't stack "-enhanced-enhanced".
+        public static string EnhancedFileName(string originalFileName)
+        {
+            string name = Path.GetFileNameWithoutExtension(originalFileName);
+            if (name.EndsWith(EnhancedSuffix, StringComparison.OrdinalIgnoreCase))
+                name = name.Substring(0, name.Length - EnhancedSuffix.Length);
+            return name + EnhancedSuffix + ".png";
+        }
+
+        public static bool IsInsideFolder(string path, string folder)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            string full = Path.GetFullPath(path);
+            string root = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+
         // Returns a destination path inside 'folder' for 'fileName', appending a numeric suffix
         // if a file with that name already exists there — so re-attaching a same-named capture
         // never silently overwrites an earlier image.

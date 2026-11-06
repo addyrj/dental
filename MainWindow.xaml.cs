@@ -233,24 +233,10 @@ namespace DentalX
                 OpenPatientProfile(dlg.NewPatientId);
         }
 
-        private void QuickExport_Click(object sender, RoutedEventArgs e)
-        {
-            // Points at the real Reports generator now that one exists (Phase 9), rather
-            // than the old raw "Save current image as..." flow.
-            SelectNav(navReports);
-            NavigateTo("Reports");
-        }
-
         private void QuickPrint_Click(object sender, RoutedEventArgs e)
         {
             SelectNav(navImaging); NavigateTo("Imaging");
             GetXrayPage().TriggerPrint();
-        }
-
-        private void QuickImportDicom_Click(object sender, RoutedEventArgs e)
-        {
-            SelectNav(navDicom);
-            NavigateTo("Dicom");
         }
 
         // ═══ HEADER ICONS ═══

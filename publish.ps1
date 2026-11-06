@@ -17,6 +17,10 @@ Write-Host "Publishing self-contained build ($version)..." -ForegroundColor Cyan
 dotnet publish DentalX.csproj -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=false -o $outDir
 
+if (Test-Path "Driver") {
+    Copy-Item "Driver" -Destination "$outDir\Driver" -Recurse -Force
+}
+
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Write-Host "Zipping..." -ForegroundColor Cyan
 Compress-Archive -Path "$outDir\*" -DestinationPath $zipPath -Force
@@ -24,4 +28,4 @@ Compress-Archive -Path "$outDir\*" -DestinationPath $zipPath -Force
 $sizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
 Write-Host ""
 Write-Host "Done: $zipPath ($sizeMB MB)" -ForegroundColor Green
-Write-Host "Send this zip to any PC, extract it fully, and run DentalX.exe — nothing else needs installing."
+Write-Host "Send this zip to any PC, extract it fully, and run DentalX.exe - nothing else needs installing."

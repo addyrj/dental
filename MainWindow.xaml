@@ -33,8 +33,8 @@
                     </Border>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="☀" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="0,0,16,0" VerticalAlignment="Center"
-                               ToolTip="Light theme — coming soon"/>
+                    <!-- <TextBlock Text="☀" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="0,0,16,0" VerticalAlignment="Center"
+                               ToolTip="Light theme — coming soon"/> -->
                     <TextBlock Text="⚙" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="0,0,16,0" VerticalAlignment="Center"
                                Cursor="Hand" MouseLeftButtonDown="SettingsIcon_Click" ToolTip="Settings"/>
                     <Border Background="{StaticResource BrAccentDim}" CornerRadius="14" Width="28" Height="28" Margin="0,0,8,0"
@@ -46,6 +46,8 @@
                         <TextBlock x:Name="txtUserName" Text="—" Foreground="{StaticResource BrText}" FontSize="12"/>
                         <TextBlock x:Name="txtUserRole" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="10"/>
                     </StackPanel>
+                    <TextBlock Text="⏻" Foreground="{StaticResource BrTextSec}" FontSize="16" Margin="14,0,0,0" VerticalAlignment="Center"
+                               Cursor="Hand" MouseLeftButtonDown="Avatar_Click" ToolTip="Log out"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -108,12 +110,6 @@
                                 <TextBlock x:Name="lblImaging" Text="Imaging" Margin="8,0,0,0"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="navAI" Style="{StaticResource NavBtn}" Tag="AI" Click="Nav_Click" ToolTip="AI Analysis">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🧠" FontSize="15" Width="22" TextAlignment="Center"/>
-                                <TextBlock x:Name="lblAI" Text="AI Analysis" Margin="8,0,0,0"/>
-                            </StackPanel>
-                        </Button>
                         <Button x:Name="navCompare" Style="{StaticResource NavBtn}" Tag="Compare" Click="Nav_Click" ToolTip="Compare">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="⊟" FontSize="15" Width="22" TextAlignment="Center"/>
@@ -144,6 +140,12 @@
                                 <TextBlock x:Name="lblDevices" Text="Devices" Margin="8,0,0,0"/>
                             </StackPanel>
                         </Button>
+                        <Button x:Name="navAI" Style="{StaticResource NavBtn}" Tag="AI" Click="Nav_Click" ToolTip="AI Analysis">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🧠" FontSize="15" Width="22" TextAlignment="Center"/>
+                                <TextBlock x:Name="lblAI" Text="AI Analysis" Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Button>
                         <Button x:Name="navBackup" Style="{StaticResource NavBtn}" Tag="Backup" Click="Nav_Click" ToolTip="Backup">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🗄" FontSize="15" Width="22" TextAlignment="Center"/>
@@ -159,11 +161,9 @@
                     </StackPanel>
 
                     <StackPanel x:Name="quickActionsPanel" Grid.Row="1" Margin="8,0,8,12">
-                        <TextBlock Text="Quick Actions" Foreground="{StaticResource BrAccent}"
-                                   FontSize="12" FontWeight="SemiBold" Margin="12,0,0,8"/>
+                        <!-- <TextBlock Text="Quick Actions" Foreground="{StaticResource BrAccent}"
+                                   FontSize="12" FontWeight="SemiBold" Margin="12,0,0,8"/> -->
                         <Button Content="＋ New Patient" Style="{StaticResource QuickAction}" Click="QuickNewPatient_Click"/>
-                        <Button Content="📥 Import DICOM" Style="{StaticResource QuickAction}" Click="QuickImportDicom_Click"/>
-                        <Button Content="📤 Export Report" Style="{StaticResource QuickAction}" Click="QuickExport_Click"/>
                         <Button Content="🖨 Print" Style="{StaticResource QuickAction}" Click="QuickPrint_Click"/>
                     </StackPanel>
                 </Grid>

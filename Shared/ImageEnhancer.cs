@@ -8,13 +8,89 @@ namespace DentalX
 {
     public class ImageEnhancer
     {
+        // ═══════════════════════════════════════════════════
+        //  RAW SENSOR → DISPLAY (log + invert + window)
+        //
+        //  The sensor's dark-subtracted signal is LINEAR in X-ray dose: air gets the most dose
+        //  (highest value) and enamel/metal the least. Shown as-is that's a flat, washed-out
+        //  negative. X-ray attenuation is exponential (Beer–Lambert), so log(signal) is
+        //  proportional to tissue thickness/density — that's what spreads enamel, dentin,
+        //  bone and pulp apart. Inverting then gives the standard radiograph look: air black,
+        //  teeth and fillings white.
+        //
+        //  The window is taken from EXPOSED pixels only (signal above 20% of the 99th percentile),
+        //  so large unexposed areas (sensor corners, cone-cut) don't waste grey levels;
+        //  they simply clamp to white, which is how they appear on film too. Measured on real
+        //  captures: tooth/bone/root sit at ~30–60% of p99, cone-cut at ~7% — a 2% cutoff let
+        //  cone-cut pull the window and left the teeth dark grey.
+        // ═══════════════════════════════════════════════════
+        public static ushort[] RawToDisplay(ushort[] raw, out ushort p99)
+        {
+            var hist = new int[65536];
+            foreach (var v in raw) hist[v]++;
+
+            p99 = Percentile(hist, raw.Length, 0.99, 0);
+            int floor = Math.Max(1, p99 / 5);
+            int exposed = 0;
+            for (int v = floor; v < 65536; v++) exposed += hist[v];
+            exposed = Math.Max(exposed, 1);
+
+            // Window = 0.5% – 99.5% of exposed pixels, in log space. log is monotonic, so the
+            // percentile of log(signal) is just log of the signal's percentile.
+            double lo = Math.Log(Math.Max(Percentile(hist, exposed, 0.005, floor), (ushort)1));
+            double hi = Math.Log(Math.Max(Percentile(hist, exposed, 0.995, floor), (ushort)1));
+            if (hi - lo < 0.05) hi = lo + 0.05; // noise-only frame: don't blow up the noise
+
+            // Lookup table over every possible 16-bit value — one log per level, not per pixel
+            var lut = new ushort[65536];
+            for (int v = 0; v < 65536; v++)
+            {
+                double t = (Math.Log(Math.Max(v, 1)) - lo) / (hi - lo);
+                lut[v] = (ushort)(Math.Clamp(1.0 - t, 0.0, 1.0) * 65535); // 1 - t = invert
+            }
+
+            var display = new ushort[raw.Length];
+            for (int i = 0; i < raw.Length; i++) display[i] = lut[raw[i]];
+            return display;
+        }
+
+        // Value at fraction q of the 'count' pixels at or above 'start' in a 16-bit histogram
+        private static ushort Percentile(int[] hist, int count, double q, int start)
+        {
+            long target = (long)(count * q), c = 0;
+            for (int v = start; v < 65536; v++)
+            {
+                c += hist[v];
+                if (c > target) return (ushort)v;
+            }
+            return 65535;
+        }
+
+        public static BitmapSource RawToDisplayBitmap(ushort[] raw, int w, int h, out ushort p99)
+        {
+            var bmp = BitmapSource.Create(w, h, 96, 96, PixelFormats.Gray16, null, RawToDisplay(raw, out p99), w * 2);
+            bmp.Freeze();
+            return bmp;
+        }
+
         // ─── WPF BitmapSource → OpenCV Mat (GRAYSCALE) ───
-        // Dental X-rays are grayscale — convert directly to Gray8
+        // 16-bit sources (sensor captures) stay 16-bit (CV_16UC1) so enhancement works on the
+        // sensor's full grey-level range; squashing to 8-bit first threw most of it away.
+        // Anything else is converted to Gray8 (CV_8UC1) as before.
         // Uses Marshal.Copy (reliable) instead of SetArray (buggy)
         public static Mat BitmapSourceToMat(BitmapSource source)
         {
             int w = source.PixelWidth;
             int h = source.PixelHeight;
+
+            if (source.Format == PixelFormats.Gray16)
+            {
+                byte[] bytes16 = new byte[h * w * 2];
+                source.CopyPixels(bytes16, w * 2, 0);
+                var mat16 = new Mat(h, w, MatType.CV_16UC1);
+                Marshal.Copy(bytes16, 0, mat16.Data, bytes16.Length);
+                return mat16;
+            }
 
             // Convert to Gray8 in WPF — avoids all BGRA channel issues
             var gray8 = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
@@ -32,6 +108,16 @@ namespace DentalX
         // Uses Marshal.Copy (reliable) instead of GetArray (buggy)
         public static BitmapSource MatToBitmapSource(Mat mat)
         {
+            if (mat.Type() == MatType.CV_16UC1)
+            {
+                int w = mat.Width, h = mat.Height;
+                byte[] bytes16 = new byte[h * w * 2];
+                Marshal.Copy(mat.Data, bytes16, 0, bytes16.Length);
+                var bmp16 = BitmapSource.Create(w, h, 96, 96, PixelFormats.Gray16, null, bytes16, w * 2);
+                bmp16.Freeze();
+                return bmp16;
+            }
+
             if (mat.Channels() == 1)
             {
                 // Grayscale → Gray8 BitmapSource
@@ -97,11 +183,66 @@ namespace DentalX
         // ═══════════════════════════════════════════════════
         //  2. DENOISE (bilateral filter)
         // ═══════════════════════════════════════════════════
+        // sigmaColor is in 8-bit grey levels (0–255) whatever the image depth.
         public static Mat ApplyDenoise(Mat input, int d = 7, double sigmaColor = 75, double sigmaSpace = 75)
         {
             using var gray = EnsureGray(input);
+            return Bilateral(gray, d, sigmaColor, sigmaSpace);
+        }
+
+        // BilateralFilter only accepts 8-bit or float, so 16-bit images go through float (0–1).
+        private static Mat Bilateral(Mat gray, int d, double sigmaColor, double sigmaSpace)
+        {
             var result = new Mat();
-            Cv2.BilateralFilter(gray, result, d, sigmaColor, sigmaSpace);
+            if (gray.Type() != MatType.CV_16UC1)
+            {
+                Cv2.BilateralFilter(gray, result, d, sigmaColor, sigmaSpace);
+                return result;
+            }
+            using var f = new Mat();
+            using var fOut = new Mat();
+            gray.ConvertTo(f, MatType.CV_32F, 1.0 / 65535);
+            Cv2.BilateralFilter(f, fOut, d, sigmaColor / 255.0, sigmaSpace);
+            fOut.ConvertTo(result, MatType.CV_16U, 65535);
+            return result;
+        }
+
+        // Gamma for either depth: 8-bit via a 256-entry LUT, 16-bit via float pow
+        // (Cv2.LUT only takes 8-bit input).
+        private static Mat Gamma(Mat gray, double gamma)
+        {
+            var result = new Mat();
+            if (gray.Type() == MatType.CV_16UC1)
+            {
+                using var f = new Mat();
+                gray.ConvertTo(f, MatType.CV_32F, 1.0 / 65535);
+                Cv2.Pow(f, 1.0 / gamma, f);
+                f.ConvertTo(result, MatType.CV_16U, 65535);
+                return result;
+            }
+            byte[] lut = new byte[256];
+            for (int i = 0; i < 256; i++)
+                lut[i] = (byte)Math.Clamp(Math.Pow(i / 255.0, 1.0 / gamma) * 255, 0, 255);
+            using var lutMat = new Mat(1, 256, MatType.CV_8UC1);
+            Marshal.Copy(lut, 0, lutMat.Data, 256);
+            Cv2.LUT(gray, lutMat, result);
+            return result;
+        }
+
+        // Brightness offset in 8-bit grey levels, scaled for 16-bit images
+        public static Mat ApplyBrightness(Mat input, double offset8)
+        {
+            var result = new Mat();
+            input.ConvertTo(result, -1, 1.0, input.Type() == MatType.CV_16UC1 ? offset8 * 257 : offset8);
+            return result;
+        }
+
+        // 8-bit copy for display-only operations (colour maps) that OpenCV only supports on 8-bit
+        public static Mat To8Bit(Mat input)
+        {
+            var result = new Mat();
+            if (input.Type() == MatType.CV_16UC1) input.ConvertTo(result, MatType.CV_8U, 1.0 / 257);
+            else input.CopyTo(result);
             return result;
         }
 
@@ -124,11 +265,11 @@ namespace DentalX
         public static Mat ApplyEdgeEnhance(Mat input, double strength = 0.3)
         {
             using var gray = EnsureGray(input);
-            using var edges16 = new Mat();
+            using var lap = new Mat();
             using var edges = new Mat();
             var result = new Mat();
-            Cv2.Laplacian(gray, edges16, MatType.CV_16S, ksize: 3);
-            edges16.ConvertTo(edges, MatType.CV_8U);
+            Cv2.Laplacian(gray, lap, MatType.CV_32F, ksize: 3);
+            lap.ConvertTo(edges, gray.Type()); // negatives clip to 0, same as before
             Cv2.AddWeighted(gray, 1.0, edges, strength, 0, result);
             return result;
         }
@@ -139,16 +280,7 @@ namespace DentalX
         public static Mat ApplyGamma(Mat input, double gamma = 0.7)
         {
             using var gray = EnsureGray(input);
-            byte[] lut = new byte[256];
-            for (int i = 0; i < 256; i++)
-                lut[i] = (byte)Math.Clamp(Math.Pow(i / 255.0, 1.0 / gamma) * 255, 0, 255);
-
-            using var lutMat = new Mat(1, 256, MatType.CV_8UC1);
-            Marshal.Copy(lut, 0, lutMat.Data, 256);
-
-            var result = new Mat();
-            Cv2.LUT(gray, lutMat, result);
-            return result;
+            return Gamma(gray, gamma);
         }
 
         // ═══════════════════════════════════════════════════
@@ -168,8 +300,9 @@ namespace DentalX
         public static Mat ApplyColorMap(Mat input, ColormapTypes colormap)
         {
             using var gray = EnsureGray(input);
+            using var gray8 = To8Bit(gray); // ApplyColorMap is 8-bit only
             var result = new Mat();
-            Cv2.ApplyColorMap(gray, result, colormap);
+            Cv2.ApplyColorMap(gray8, result, colormap);
             return result; // Returns 3-channel BGR
         }
 
@@ -187,8 +320,7 @@ namespace DentalX
             // Step 1: Denoise
             if (denoise)
             {
-                var denoised = new Mat();
-                Cv2.BilateralFilter(current, denoised, 7, 75, 75);
+                var denoised = Bilateral(current, 7, 75, 75);
                 current.Dispose();
                 current = denoised;
             }
@@ -211,15 +343,7 @@ namespace DentalX
             current = sharpened;
 
             // Step 4: Gamma
-            byte[] lut = new byte[256];
-            for (int i = 0; i < 256; i++)
-                lut[i] = (byte)Math.Clamp(Math.Pow(i / 255.0, 1.0 / gamma) * 255, 0, 255);
-
-            using var lutMat = new Mat(1, 256, MatType.CV_8UC1);
-            Marshal.Copy(lut, 0, lutMat.Data, 256);
-
-            var gammaResult = new Mat();
-            Cv2.LUT(current, lutMat, gammaResult);
+            var gammaResult = Gamma(current, gamma);
             current.Dispose();
 
             return gammaResult;

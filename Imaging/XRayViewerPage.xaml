@@ -18,9 +18,6 @@
                         Background="#1A7A6E" Margin="0,0,6,0" Click="btnConnect_Click"/>
                 <Button x:Name="btnCapture" Content="◉ Capture X-Ray" Style="{StaticResource ToolbarBtn}"
                         Background="#C13A44" Margin="0,0,6,0" Click="btnCapture_Click" IsEnabled="False"/>
-                <Button Content="🧪 Test" Style="{StaticResource ToolbarBtn}"
-                        Background="#4A5568" Margin="0,0,6,0" Click="btnTestCapture_Click"
-                        ToolTip="Test capture without X-ray"/>
                 <Button Content="📂 Load Image" Style="{StaticResource ToolbarBtn}"
                         Background="#2563EB" Margin="0,0,6,0" Click="btnLoad_Click"/>
                 <Button Content="✦ Enhance" Style="{StaticResource ToolbarBtn}"
@@ -30,8 +27,11 @@
                 <Button Content="✕ Clear" Style="{StaticResource ToolbarBtn}"
                         Background="#DC2626" Margin="0,0,6,0" Click="btnClear_Click"/>
                 <Button Content="🗑 Delete" Style="{StaticResource ToolbarBtn}" Background="#7F1D1D" Margin="0,0,6,0" Click="btnDeleteImage_Click"/>
-                <Button Content="👥 All Patients" Style="{StaticResource ToolbarBtn}"
-                        Background="#D97706" Click="btnPatients_Click"/>
+                <Button x:Name="btnToothLength" Content="🦷 Tooth Length" Style="{StaticResource ToolbarBtn}" Background="#B45309"
+                        Margin="0,0,6,0" Click="btnToothLength_Click"
+                        ToolTip="Auto-detects teeth and draws length (yellow) + crown breadth (pink). Drag any end to adjust, right-click a line to remove. To add a missed tooth: click its crown tip, then its root apex. Esc or click again to finish."/>
+                <Button Content="🧹 Clear Lengths" Style="{StaticResource ToolbarBtn}" Background="#44403C"
+                        Click="btnToothClear_Click" ToolTip="Remove all tooth length and breadth lines from this image"/>
             </StackPanel>
         </Border>
 
@@ -71,18 +71,15 @@
                     <Border Grid.Column="0" Background="{StaticResource BrBgPanel}" CornerRadius="8,0,0,8" Margin="4,0,0,0">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="4,8">
-                            <Button x:Name="toolPan" Content="✋" Style="{StaticResource ViewerTool}" ToolTip="Pan (hold middle mouse)" Click="btnToolPan_Click"/>
                             <Button x:Name="toolSelect" Content="↖" Style="{StaticResource ViewerTool}" ToolTip="Select"/>
-                            <Button Content="⊕" Style="{StaticResource ViewerTool}" ToolTip="Zoom In (+)" Click="btnZoomIn_Click"/>
-                            <Button Content="⊖" Style="{StaticResource ViewerTool}" ToolTip="Zoom Out (-)" Click="btnZoomOut_Click"/>
                             <Button x:Name="toolMagnifier" Content="🔍" Style="{StaticResource ViewerTool}" ToolTip="Magnifier — hover the image to inspect at high zoom" Click="btnMagnifier_Click"/>
                             <Button Content="↻" Style="{StaticResource ViewerTool}" ToolTip="Rotate (R)" Click="btnRotate_Click"/>
-                            <Button Content="☀" Style="{StaticResource ViewerTool}" ToolTip="Window/Level (right-drag)" Click="btnPresetNormal_Click"/>
                             <Button x:Name="btnCrop" Content="⬒" Style="{StaticResource ViewerTool}" ToolTip="Crop — drag a rectangle, then Apply" Click="btnCrop_Click"/>
                             <Button x:Name="btnAnnotate" Content="✎" Style="{StaticResource ViewerTool}" ToolTip="Annotate — click to add a text label (right-click a label to remove it)" Click="btnAnnotate_Click"/>
                             <Button x:Name="btnMeasure" Content="📏" Style="{StaticResource ViewerTool}" ToolTip="Measure — Distance, Tooth Length, Angle, Calibration" Click="btnMeasure_Click"/>
                             <Button Content="T" Style="{StaticResource ViewerTool}" ToolTip="Text annotation" FontWeight="Bold" Click="btnAnnotate_Click"/>
-                            <Button Content="▭" Style="{StaticResource ViewerTool}" ToolTip="ROI rectangle (coming soon)" Click="btnPlaceholder_Click"/>
+                            <!-- ROI rectangle removed for now (was a "coming soon" placeholder):
+                            <Button Content="▭" Style="{StaticResource ViewerTool}" ToolTip="ROI rectangle (coming soon)" Click="btnPlaceholder_Click"/> -->
                         </StackPanel>
                         </ScrollViewer>
                     </Border>
@@ -212,8 +209,6 @@
                                 ValueChanged="sliderZoom_ValueChanged"/>
                         <Button Content="☀" Style="{StaticResource ViewerTool}" Width="28" Height="28"
                                 ToolTip="Auto Enhance" Click="btnPresetNormal_Click"/>
-                        <Button Content="◑" Style="{StaticResource ViewerTool}" Width="28" Height="28"
-                                Click="btnInvert_Click" ToolTip="Invert (I)"/>
                         <Button Content="⛶" Style="{StaticResource ViewerTool}" Width="28" Height="28"
                                 ToolTip="Reset View" Click="btnFit_Click"/>
                         <Button Content="⤢" Style="{StaticResource ViewerTool}" Width="28" Height="28"
@@ -282,7 +277,25 @@
                              the Devices page. -->
 
                         <!-- Enhancement Sliders -->
-                        <TextBlock Text="Enhancement" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <!-- Sliders apply live (no Apply button) on top of the active preset;
+                             Reset clears both back to the original image. -->
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="Enhancement" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                            <Button Content="↺ Reset" HorizontalAlignment="Right" Height="24" Padding="10,0"
+                                    Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrTextSec}"
+                                    FontSize="11" BorderThickness="0" Cursor="Hand" Click="btnResetSliders_Click"
+                                    ToolTip="Reset sliders and preset to the original image (Ctrl+Z)">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"
+                                                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
                         <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,6"
                                 BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                             <StackPanel>
@@ -313,36 +326,6 @@
                                 </Grid>
                                 <Slider x:Name="sliderSharp" Minimum="0" Maximum="3" Value="0" SmallChange="0.1"
                                         ValueChanged="EnhSlider_ValueChanged"/>
-
-                                <Grid Margin="0,10,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Content="Apply" Grid.Column="0" Height="30" Margin="0,0,3,0"
-                                            Background="{StaticResource BrAccentDim}" Foreground="{StaticResource BrAccent}"
-                                            FontSize="11" FontWeight="SemiBold" BorderThickness="0" Click="btnApplySliders_Click">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border Background="{TemplateBinding Background}" CornerRadius="6">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-                                    <Button Content="Reset" Grid.Column="1" Height="30" Margin="3,0,0,0"
-                                            Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrTextSec}"
-                                            FontSize="11" BorderThickness="0" Click="btnResetSliders_Click">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border Background="{TemplateBinding Background}" CornerRadius="6"
-                                                        BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                </Border>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -366,51 +349,23 @@
                                     Height="28" Padding="10,0" Margin="0,0,4,4" FontSize="11" Click="btnEdgeMap_Click"/>
                         </WrapPanel>
 
-                        <!-- AI Analysis -->
-                        <TextBlock Text="AI Analysis" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,14"
-                                BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock x:Name="txtAIStatus" Text="AI Detection: coming soon" Foreground="{StaticResource BrAccent}"
-                                           FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <Ellipse Width="8" Height="8" Fill="#EF4444" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Caries" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
-                                    <TextBlock x:Name="txtAICaries" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <Ellipse Width="8" Height="8" Fill="#F59E0B" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Bone Loss" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
-                                    <TextBlock x:Name="txtAIBone" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <Ellipse Width="8" Height="8" Fill="#F97316" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Periapical Radiolucency" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
-                                    <TextBlock x:Name="txtAIPerio" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <Ellipse Width="8" Height="8" Fill="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Calculus" Foreground="{StaticResource BrTextSec}" FontSize="12" Width="126" TextWrapping="Wrap"/>
-                                    <TextBlock x:Name="txtAICalc" Text="—" Foreground="{StaticResource BrTextMuted}" FontSize="12"/>
-                                </StackPanel>
-                                <Button Content="View Full Analysis" Height="32" Margin="0,8,0,0"
-                                        Background="{StaticResource BrAccentDim}" Foreground="{StaticResource BrAccent}"
-                                        FontSize="11" FontWeight="SemiBold" BorderThickness="0" Click="btnAIAnalysis_Click">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}" CornerRadius="6">
-                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-
                         <!-- Attach to Patient — picks an EXISTING patient rather than free-form
                              creating a new one, so this doesn't spawn duplicate patient rows.
                              Full patient create/edit/delete lives on the Patients pages. -->
-                        <TextBlock Text="Patient" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="Patient" Foreground="{StaticResource BrText}" FontSize="14" FontWeight="SemiBold"/>
+                            <Button Content="🔄" HorizontalAlignment="Right" Width="26" Height="26" Padding="0"
+                                    Background="{StaticResource BrBgCard}" Foreground="{StaticResource BrText}" FontSize="12" BorderThickness="0"
+                                    Cursor="Hand" Click="btnPatients_Click" ToolTip="Refresh the patient list">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
                         <Border Background="{StaticResource BrBgPanel}" CornerRadius="8" Padding="12" Margin="0,0,0,14"
                                 BorderBrush="{StaticResource BrBorder}" BorderThickness="1">
                             <StackPanel>
